@@ -11,15 +11,21 @@ import (
 	"time"
 
 	"giiny/internal/imvu"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	_ = godotenv.Load("../.env")
+
 	imvuClient, err := imvu.New()
 	if err != nil {
 		log.Fatalf("Failed to create IMVU client: %v", err)
 	}
 
-	err = imvuClient.Authenticate(os.Getenv("username"), os.Getenv("password"))
+	username := os.Getenv("USERNAME")
+	password := os.Getenv("PASSWORD")
+	err = imvuClient.Authenticate(username, password)
 	if err != nil {
 		log.Fatalf("Authentication failed: %v", err)
 	}
@@ -40,7 +46,7 @@ func main() {
 		log.Fatalf("Failed to get user: %v", err)
 	}
 
-	err = imvuClient.EnterChat(me.Sauce)
+	err = imvuClient.JoinRoom(me.Sauce)
 	if err != nil {
 		log.Fatalf("Failed to enter chat: %v", err)
 	}
@@ -127,45 +133,31 @@ func main() {
 	// Wait a moment before sending the chat message
 	time.Sleep(500 * time.Millisecond)
 
-	// Send a chat message
-	fmt.Println("Sending chat message...")
-
-	// Create the chat message payload
-	type ChatMessagePayload struct {
-		ChatID  string `json:"chatId"`
-		Message string `json:"message"`
-		To      int    `json:"to"`
-		UserID  string `json:"userId"`
-	}
-
-	chatPayload := ChatMessagePayload{
-		ChatID:  "339",
-		Message: "*imvu:isPureUser",
-		To:      0,
-		UserID:  id,
-	}
-
-	// Marshal the payload to JSON
-	payloadJSON, err := json.Marshal(chatPayload)
-	if err != nil {
-		log.Printf("Failed to marshal chat payload: %v", err)
-	}
-
-	// Base64 encode the JSON payload
-	encodedPayload := base64.StdEncoding.EncodeToString(payloadJSON)
-
-	fmt.Printf("Encoded payload: %s\n", encodedPayload)
-
 	err = imvuClient.SendChatMessage(
 		"/chat/1286100305",
 		"messages",
-		encodedPayload,
+		generateMessage("*imvu:isPureUser", userID),
 		56,
 	)
 	if err != nil {
 		log.Printf("Failed to send chat message: %v", err)
 	} else {
 		fmt.Println("Chat message sent successfully")
+	}
+
+	for i := 0; i < 10; i++ {
+		err = imvuClient.SendChatMessage(
+			"/chat/1286100305",
+			"messages",
+			generateMessage(fmt.Sprintf("This is test message %d", i), userID),
+			56,
+		)
+		if err != nil {
+			log.Printf("Failed to send chat message: %v", err)
+		} else {
+			fmt.Println("Chat message sent successfully")
+		}
+		time.Sleep(200)
 	}
 
 	// Wait a moment before sending the ping
@@ -223,4 +215,32 @@ func main() {
 			return
 		}
 	}
+}
+
+func generateMessage(message, userID string) string {
+	// Create the chat message payload
+	type ChatMessagePayload struct {
+		ChatID  string `json:"chatId"`
+		Message string `json:"message"`
+		To      int    `json:"to"`
+		UserID  string `json:"userId"`
+	}
+
+	chatPayload := ChatMessagePayload{
+		ChatID:  "339",
+		Message: message,
+		To:      0,
+		UserID:  userID,
+	}
+
+	// Marshal the payload to JSON
+	payloadJSON, err := json.Marshal(chatPayload)
+	if err != nil {
+		log.Printf("Failed to marshal chat payload: %v", err)
+	}
+
+	// Base64 encode the JSON payload
+	encodedPayload := base64.StdEncoding.EncodeToString(payloadJSON)
+
+	return encodedPayload
 }

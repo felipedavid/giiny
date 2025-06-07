@@ -119,7 +119,7 @@ func (i *IMVU) GetUser(username string) (*User, error) {
 	return userResp.User, nil
 }
 
-func (i *IMVU) EnterChat(sauce string) error {
+func (i *IMVU) JoinRoom(sauce string) error {
 	headers := map[string]string{
 		"X-Imvu-Sauce": sauce,
 	}
