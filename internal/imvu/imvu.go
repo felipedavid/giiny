@@ -64,12 +64,12 @@ func (i *IMVU) JoinRoom(roomID, chatID string) error {
 		return fmt.Errorf("failed to join room: %w", err)
 	}
 
-	err = i.api.SendSubscribe("inv:/scene/scene-361230062-339", 148)
+	err = i.api.SendSubscribe(fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, chatID), 148)
 	if err != nil {
 		return fmt.Errorf("failed to send scene subscribe message: %w", err)
 	}
 
-	err = i.api.SendSubscribe("/chat/1286100305", 153)
+	err = i.api.SendSubscribe("/chat/1285983375", 153)
 	if err != nil {
 		return fmt.Errorf("failed to send chat subscribe message: %w", err)
 	}

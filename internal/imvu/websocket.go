@@ -189,6 +189,9 @@ func (wsc *WebSocketClient) SendMessage(message interface{}) error {
 		return fmt.Errorf("websocket not connected")
 	}
 
+	// Log the message being sent
+	log.Printf("Sending message: %+v", message)
+
 	return wsc.conn.WriteJSON(message)
 }
 
