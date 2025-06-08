@@ -13,20 +13,18 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-// Client represents an HTTP client for IMVU API
-type Client struct {
+const baseURL = "https://api.imvu.com"
+
+type HTTPClient struct {
 	httpClient *http.Client
 	baseURL    string
 	userAgent  string
 	headers    map[string]string
 }
 
-// ClientOption is a function that configures a Client
-type ClientOption func(*Client)
+type ClientOption func(*HTTPClient)
 
-// NewClient creates a new IMVU API client with the given options
-func NewClient(options ...ClientOption) (*Client, error) {
-	// Create cookie jar for storing cookies
+func NewClient(options ...ClientOption) (*HTTPClient, error) {
 	jar, err := cookiejar.New(&cookiejar.Options{
 		PublicSuffixList: publicsuffix.List,
 	})
@@ -34,13 +32,12 @@ func NewClient(options ...ClientOption) (*Client, error) {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
 	}
 
-	// Default client configuration
-	client := &Client{
+	client := &HTTPClient{
 		httpClient: &http.Client{
 			Jar:     jar,
 			Timeout: 30 * time.Second,
 		},
-		baseURL:   "https://api.imvu.com",
+		baseURL:   baseURL,
 		userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
 		headers: map[string]string{
 			"Accept":             "application/json; charset=utf-8",
@@ -56,7 +53,6 @@ func NewClient(options ...ClientOption) (*Client, error) {
 		},
 	}
 
-	// Apply options
 	for _, option := range options {
 		option(client)
 	}
@@ -64,40 +60,33 @@ func NewClient(options ...ClientOption) (*Client, error) {
 	return client, nil
 }
 
-// WithBaseURL sets the base URL for the client
 func WithBaseURL(baseURL string) ClientOption {
-	return func(c *Client) {
+	return func(c *HTTPClient) {
 		c.baseURL = baseURL
 	}
 }
 
-// WithUserAgent sets the User-Agent header for the client
 func WithUserAgent(userAgent string) ClientOption {
-	return func(c *Client) {
+	return func(c *HTTPClient) {
 		c.userAgent = userAgent
 	}
 }
 
-// WithHeader adds or updates a header for the client
 func WithHeader(key, value string) ClientOption {
-	return func(c *Client) {
+	return func(c *HTTPClient) {
 		c.headers[key] = value
 	}
 }
 
-// WithTimeout sets the timeout for the client
 func WithTimeout(timeout time.Duration) ClientOption {
-	return func(c *Client) {
+	return func(c *HTTPClient) {
 		c.httpClient.Timeout = timeout
 	}
 }
 
-// Request makes an HTTP request to the IMVU API
-func (c *Client) Request(method, path string, body interface{}, headers map[string]string) (*http.Response, error) {
-	// Construct the full URL
+func (c *HTTPClient) Request(method, path string, body interface{}, headers map[string]string) (*http.Response, error) {
 	fullURL := c.baseURL + path
 
-	// Create request body if provided
 	var bodyReader io.Reader
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
@@ -107,31 +96,25 @@ func (c *Client) Request(method, path string, body interface{}, headers map[stri
 		bodyReader = bytes.NewReader(jsonBody)
 	}
 
-	// Create the request
 	req, err := http.NewRequest(method, fullURL, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set User-Agent
 	req.Header.Set("User-Agent", c.userAgent)
 
-	// Set default headers
 	for key, value := range c.headers {
 		req.Header.Set(key, value)
 	}
 
-	// Set request-specific headers
 	for key, value := range headers {
 		req.Header.Set(key, value)
 	}
 
-	// Set Referer for browser-like behavior
 	if req.Header.Get("Referer") == "" {
 		req.Header.Set("Referer", "https://pt.secure.imvu.com/")
 	}
 
-	// Make the request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
@@ -140,28 +123,23 @@ func (c *Client) Request(method, path string, body interface{}, headers map[stri
 	return resp, nil
 }
 
-// Get makes a GET request to the IMVU API
-func (c *Client) Get(path string, headers map[string]string) (*http.Response, error) {
+func (c *HTTPClient) Get(path string, headers map[string]string) (*http.Response, error) {
 	return c.Request(http.MethodGet, path, nil, headers)
 }
 
-// Post makes a POST request to the IMVU API
-func (c *Client) Post(path string, body interface{}, headers map[string]string) (*http.Response, error) {
+func (c *HTTPClient) Post(path string, body interface{}, headers map[string]string) (*http.Response, error) {
 	return c.Request(http.MethodPost, path, body, headers)
 }
 
-// Put makes a PUT request to the IMVU API
-func (c *Client) Put(path string, body interface{}, headers map[string]string) (*http.Response, error) {
+func (c *HTTPClient) Put(path string, body interface{}, headers map[string]string) (*http.Response, error) {
 	return c.Request(http.MethodPut, path, body, headers)
 }
 
-// Delete makes a DELETE request to the IMVU API
-func (c *Client) Delete(path string, headers map[string]string) (*http.Response, error) {
+func (c *HTTPClient) Delete(path string, headers map[string]string) (*http.Response, error) {
 	return c.Request(http.MethodDelete, path, nil, headers)
 }
 
-// GetCookies returns all cookies for a given URL
-func (c *Client) GetCookies(urlStr string) ([]*http.Cookie, error) {
+func (c *HTTPClient) GetCookies(urlStr string) ([]*http.Cookie, error) {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URL: %w", err)
@@ -169,8 +147,7 @@ func (c *Client) GetCookies(urlStr string) ([]*http.Cookie, error) {
 	return c.httpClient.Jar.Cookies(parsedURL), nil
 }
 
-// SetCookies sets cookies for a given URL
-func (c *Client) SetCookies(urlStr string, cookies []*http.Cookie) error {
+func (c *HTTPClient) SetCookies(urlStr string, cookies []*http.Cookie) error {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return fmt.Errorf("failed to parse URL: %w", err)
