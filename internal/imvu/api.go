@@ -95,11 +95,7 @@ func (i *API) GetUser(userID string) (*User, error) {
 }
 
 func (i *API) JoinRoom(sauce, roomID, chatID string) error {
-	headers := map[string]string{
-		"X-Imvu-Sauce": sauce,
-	}
-
-	resp, err := i.client.Post(fmt.Sprintf("/chat/chat-%s-%s/participants", roomID, chatID), map[string]string{}, headers)
+	resp, err := i.client.Post(fmt.Sprintf("/chat/chat-%s-%s/participants", roomID, chatID), map[string]string{}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to enter chat: %w", err)
 	}
@@ -111,6 +107,21 @@ func (i *API) JoinRoom(sauce, roomID, chatID string) error {
 	}
 	if err := chatResp.ParseEnterChatResponse(); err != nil {
 		return fmt.Errorf("failed to parse chat data: %w", err)
+	}
+
+	return nil
+}
+
+func (i *API) LeaveRoom(roomID, chatID, userID string) error {
+	resp, err := i.client.Delete(fmt.Sprintf("/chat/chat-%s-%s/participants/user-%s", roomID, chatID, userID), nil)
+	if err != nil {
+		return fmt.Errorf("failed to leave chat: %w", err)
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to leave chat with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	return nil

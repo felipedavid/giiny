@@ -22,6 +22,10 @@ type HTTPClient struct {
 	headers    map[string]string
 }
 
+func (c *HTTPClient) AddHeader(key, value string) {
+	c.headers[key] = value
+}
+
 type ClientOption func(*HTTPClient)
 
 func NewClient(options ...ClientOption) (*HTTPClient, error) {

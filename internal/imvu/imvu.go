@@ -8,6 +8,15 @@ import (
 	"strings"
 )
 
+var opID = 160
+
+func getOpID() int {
+	// Add locks if needed
+	result := opID
+	opID++
+	return result
+}
+
 type IMVU struct {
 	Authenticated bool
 	UserID        string
@@ -51,6 +60,8 @@ func (i *IMVU) Login(username, password string) error {
 		return fmt.Errorf("failed to connect to WebSocket: %w", err)
 	}
 
+	i.api.client.AddHeader("X-Imvu-Sauce", me.Sauce)
+
 	i.sauce = me.Sauce
 	i.Authenticated = true
 	i.User = user
@@ -64,12 +75,12 @@ func (i *IMVU) JoinRoom(roomID, chatID string) error {
 		return fmt.Errorf("failed to join room: %w", err)
 	}
 
-	err = i.api.SendSubscribe(fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, chatID), 148)
+	err = i.api.SendSubscribe(fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, chatID), getOpID())
 	if err != nil {
 		return fmt.Errorf("failed to send scene subscribe message: %w", err)
 	}
 
-	err = i.api.SendSubscribe("/chat/1285983375", 153)
+	err = i.api.SendSubscribe("/chat/1286931824", getOpID())
 	if err != nil {
 		return fmt.Errorf("failed to send chat subscribe message: %w", err)
 	}
@@ -77,12 +88,21 @@ func (i *IMVU) JoinRoom(roomID, chatID string) error {
 	return nil
 }
 
+func (i *IMVU) LeaveRoom(roomID, chatID string) error {
+	err := i.api.LeaveRoom(roomID, chatID, i.UserID)
+	if err != nil {
+		return fmt.Errorf("failed to leave room: %w", err)
+	}
+
+	return nil
+}
+
 func (i *IMVU) SendChatMessage(message string) error {
 	err := i.api.SendChatMessage(
-		"/chat/1285983375",
+		"/chat/1286931824",
 		"messages",
 		generateMessage(message, i.UserID),
-		154,
+		getOpID(),
 	)
 	return err
 }
