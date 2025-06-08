@@ -30,12 +30,14 @@ func main() {
 		log.Fatalf("Failed to join room: %v", err)
 	}
 
-	imvu.SendChatMessage("Hi there")
+	imvu.SendChatMessage("*imvu:isPureUser")
+	imvu.SendChatMessage("*putOnOutfit 70312022 12444122 13831030 16070306 19442649 23974249 55139083 55595518 63520397 63520471 70082645 70082730 55595754 61753525 62845575 59508957 63520653 63520746")
+	imvu.SendChatMessage("*msg SeatAssignment 3 373088882 2 0")
 
-	err = imvu.LeaveRoom("361230062", "140")
-	if err != nil {
-		log.Fatalf("Failed to leave room: %v", err)
-	}
+	//err = imvu.LeaveRoom("361230062", "140")
+	//if err != nil {
+	//	log.Fatalf("Failed to leave room: %v", err)
+	//}
 
 	for {
 		time.Sleep(1 * time.Second)
