@@ -75,7 +75,7 @@ func NewWebSocketClient(url string, headers http.Header) *WebSocketClient {
 		url:               url,
 		headers:           headers,
 		done:              make(chan struct{}),
-		pingInterval:      16 * time.Second,
+		pingInterval:      5 * time.Second,
 		reconnectInterval: 5 * time.Second,
 	}
 }
@@ -181,16 +181,13 @@ func (wsc *WebSocketClient) SetMessageHandler(handler func(message []byte)) {
 }
 
 // SendMessage sends a message over the WebSocket connection
-func (wsc *WebSocketClient) SendMessage(message interface{}) error {
+func (wsc *WebSocketClient) SendMessage(message any) error {
 	wsc.mu.Lock()
 	defer wsc.mu.Unlock()
 
 	if !wsc.isConnected {
 		return fmt.Errorf("websocket not connected")
 	}
-
-	// Log the message being sent
-	log.Printf("Sending message: %+v", message)
 
 	return wsc.conn.WriteJSON(message)
 }
@@ -205,15 +202,15 @@ func (wsc *WebSocketClient) SendConnect(userID, cookie string) error {
 			{
 				Record: "metadata",
 				Key:    "app",
-				Value:  "aW12dV9uZXh0",
+				Value:  base64.StdEncoding.EncodeToString([]byte("imvu_next")),
 			},
 			{
 				Record: "metadata",
 				Key:    "platform_type",
-				Value:  "Ymln",
+				Value:  base64.StdEncoding.EncodeToString([]byte("big")),
 			},
 		},
-		OpID: 0,
+		OpID: OpID.Get(),
 	}
 	return wsc.SendMessage(connectMessage)
 }
@@ -230,18 +227,32 @@ func (wsc *WebSocketClient) SendSubscribe(name string, opID int) error {
 			},
 		},
 	}
+
+	fmt.Printf("[SUBSCRIBING_TO_CHANNEL] [CHANNEL: %s] [OPID: %d]\n", name, opID)
+
 	return wsc.SendMessage(subscribeMessage)
 }
 
 // SendChatMessage sends a chat message to the server
-func (wsc *WebSocketClient) SendChatMessage(queue, mount, message string, opID int) error {
+func (wsc *WebSocketClient) SendChatMessage(queue, mount string, chatPayload ChatMessagePayload) error {
+	payloadJSON, err := json.Marshal(chatPayload)
+	if err != nil {
+		log.Printf("Failed to marshal chat payload: %v", err)
+	}
+
+	// Base64 encode the JSON payload
+	encodedPayload := base64.StdEncoding.EncodeToString(payloadJSON)
+
 	sendMessageMessage := WebSocketSendMessageMessage{
 		Record:  "msg_c2g_send_message",
 		Queue:   queue,
 		Mount:   mount,
-		Message: message,
-		OpID:    opID,
+		Message: encodedPayload,
+		OpID:    OpID.Get(),
 	}
+
+	fmt.Printf("[SENDING_CHAT_MESSAGE] [QUEUE: %s] [MOUNT: %s] [MESSAGE: %s] [OPID: %d]\n", queue, mount, string(chatPayload.Message), OpID.ID)
+
 	return wsc.SendMessage(sendMessageMessage)
 }
 
@@ -250,6 +261,9 @@ func (wsc *WebSocketClient) SendPing() error {
 	pingMessage := WebSocketMessage{
 		Record: "msg_c2g_ping",
 	}
+
+	fmt.Printf("[SENDING_PING_MESSAGE] [RECORD: %s]\n", pingMessage.Record)
+
 	return wsc.SendMessage(pingMessage)
 }
 
@@ -316,6 +330,7 @@ func (wsc *WebSocketClient) handleMessage(message []byte) {
 		// Check if it's a pong message
 		if wsMessage.Record == "msg_g2c_pong" {
 			log.Printf("Received pong message: %s", string(message))
+			fmt.Printf("-> [RECEIVED_PONG_MESSAGE] [RECORD: %s]\n", wsMessage.Record)
 			wsc.mu.Lock()
 			wsc.lastPongReceived = time.Now()
 			wsc.mu.Unlock()

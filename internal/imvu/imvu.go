@@ -1,19 +1,25 @@
 package imvu
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
+	"sync"
 )
 
-var opID = 160
+var OpID = OperationID{ID: 57}
 
-func getOpID() int {
-	// Add locks if needed
-	result := opID
-	opID++
+type OperationID struct {
+	ID int
+	sync.Mutex
+}
+
+func (o *OperationID) Get() int {
+	o.Lock()
+	defer o.Unlock()
+
+	// Increment the ID and return it
+	result := o.ID
+	o.ID++
 	return result
 }
 
@@ -75,12 +81,17 @@ func (i *IMVU) JoinRoom(roomID, chatID string) error {
 		return fmt.Errorf("failed to join room: %w", err)
 	}
 
-	err = i.api.SendSubscribe(fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, chatID), getOpID())
+	err = i.api.SendSubscribe(fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, chatID), OpID.Get())
 	if err != nil {
 		return fmt.Errorf("failed to send scene subscribe message: %w", err)
 	}
 
-	err = i.api.SendSubscribe("/chat/1286931824", getOpID())
+	err = i.api.SendSubscribe(fmt.Sprintf("inv:/room/room-%s-%s", roomID, chatID), OpID.Get())
+	if err != nil {
+		return fmt.Errorf("failed to send scene subscribe message: %w", err)
+	}
+
+	err = i.api.SendSubscribe("/chat/1286931824", OpID.Get())
 	if err != nil {
 		return fmt.Errorf("failed to send chat subscribe message: %w", err)
 	}
@@ -98,39 +109,17 @@ func (i *IMVU) LeaveRoom(roomID, chatID string) error {
 }
 
 func (i *IMVU) SendChatMessage(message string) error {
-	err := i.api.SendChatMessage(
-		"/chat/1286931824",
-		"messages",
-		generateMessage(message, i.UserID),
-		getOpID(),
-	)
-	return err
-}
-
-func generateMessage(message, userID string) string {
-	// Create the chat message payload
-	type ChatMessagePayload struct {
-		ChatID  string `json:"chatId"`
-		Message string `json:"message"`
-		To      int    `json:"to"`
-		UserID  string `json:"userId"`
-	}
-
-	chatPayload := ChatMessagePayload{
+	payload := ChatMessagePayload{
 		ChatID:  "140",
 		Message: message,
 		To:      0,
-		UserID:  userID,
+		UserID:  i.UserID,
 	}
 
-	// Marshal the payload to JSON
-	payloadJSON, err := json.Marshal(chatPayload)
-	if err != nil {
-		log.Printf("Failed to marshal chat payload: %v", err)
-	}
-
-	// Base64 encode the JSON payload
-	encodedPayload := base64.StdEncoding.EncodeToString(payloadJSON)
-
-	return encodedPayload
+	err := i.api.SendChatMessage(
+		"/chat/1286931824",
+		"messages",
+		payload,
+	)
+	return err
 }

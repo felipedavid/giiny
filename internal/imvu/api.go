@@ -151,12 +151,12 @@ func (i *API) ConnectMsgStream(userID string) error {
 	i.ws = NewWebSocketClient(wsURL, headers)
 
 	i.ws.SetMessageHandler(func(message []byte) {
-		log.Printf("Received WebSocket message: %s", string(message))
+		//log.Printf("Received WebSocket message: %s", string(message))
 
-		var msgData map[string]interface{}
-		if err := json.Unmarshal(message, &msgData); err == nil {
-			log.Printf("Parsed message data: %v", msgData)
-		}
+		//var msgData map[string]interface{}
+		//if err := json.Unmarshal(message, &msgData); err == nil {
+		//	log.Printf("Parsed message data: %v", msgData)
+		//}
 	})
 
 	if err := i.ws.Connect(); err != nil {
@@ -220,11 +220,12 @@ func (i *API) SendSubscribe(name string, opID int) error {
 	return i.ws.SendSubscribe(name, opID)
 }
 
-func (i *API) SendChatMessage(queue, mount, message string, opID int) error {
+func (i *API) SendChatMessage(queue, mount string, payload ChatMessagePayload) error {
 	if i.ws == nil {
 		return fmt.Errorf("WebSocket not connected")
 	}
-	return i.ws.SendChatMessage(queue, mount, message, opID)
+
+	return i.ws.SendChatMessage(queue, mount, payload)
 }
 
 func (i *API) SendPing() error {

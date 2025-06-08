@@ -216,3 +216,10 @@ func (r *EnterChatResponse) ParseEnterChatResponse() error {
 
 	return nil
 }
+
+type ChatMessagePayload struct {
+	ChatID  string `json:"chatId"`
+	Message string `json:"message"`
+	To      int    `json:"to"`
+	UserID  string `json:"userId"`
+}
