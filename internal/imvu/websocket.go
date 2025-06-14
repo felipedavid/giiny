@@ -215,8 +215,8 @@ func (wsc *WebSocketClient) SendConnect(userID, cookie string) error {
 	return wsc.SendMessage(connectMessage)
 }
 
-// SendSubscribe sends a subscribe message to the server
-func (wsc *WebSocketClient) SendSubscribe(name string, opID int) error {
+// SendSubscribeToQueue sends a subscribe message to the server
+func (wsc *WebSocketClient) SendSubscribeToQueue(name string, opID int) error {
 	subscribeMessage := WebSocketSubscribeMessage{
 		Record: "msg_c2g_subscribe",
 		QueuesWithResults: []WebSocketSubscription{

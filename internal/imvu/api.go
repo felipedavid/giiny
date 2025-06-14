@@ -267,11 +267,11 @@ func (i *API) SendConnect(userID, cookie string) error {
 	return i.ws.SendConnect(userID, cookie)
 }
 
-func (i *API) SendSubscribe(name string, opID int) error {
+func (i *API) SubscribeToQueue(queue string, opID int) error {
 	if i.ws == nil {
 		return fmt.Errorf("WebSocket not connected")
 	}
-	return i.ws.SendSubscribe(name, opID)
+	return i.ws.SendSubscribeToQueue(queue, opID)
 }
 
 func (i *API) SendChatMessage(queue, mount string, payload ChatMessagePayload) error {
