@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"giiny/internal/imvu"
@@ -28,37 +29,40 @@ func main() {
 	}
 
 	roomURL := os.Getenv("ROOM_URL")
-	roomID, roomChatID := getRoomIDsFromURL(roomURL)
+	ownerID, chatroomID := getRoomIDsFromURL(roomURL)
 
-	err = client.JoinRoom(roomID, roomChatID)
+	err = client.JoinRoom(ownerID, chatroomID)
 	if err != nil {
 		log.Fatalf("Failed to join room: %v", err)
 	}
 
-	time.Sleep(5 * time.Second)
-	client.SendChatMessage("Hii gomp senpai :3")
-	time.Sleep(5 * time.Second)
-
-	err = client.LeaveRoom(roomID, roomChatID)
+	err = client.SendChatMessage("Hii gomp senpai :3")
 	if err != nil {
-		log.Fatalf("Failed to leave room: %v", err)
+		log.Printf("Failed to send chat message: %v", err)
 	}
 
-	start := time.Now()
+	stop := make(chan os.Signal, 1)
+	// Listen for termination signals including those sent by debuggers
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 
 	go func() {
+		start := time.Now()
 		for {
-			time.Sleep(1 * time.Minute)
-			client.SendChatMessage(fmt.Sprintf("Current time: %s, Uptime: %s", time.Now().Format(time.RFC3339), time.Since(start)))
-			err = client.JoinRoom("361230062", "140")
+			time.Sleep(90 * time.Second)
+			log.Printf("Current time: %s, Uptime: %s\n", time.Now().Format(time.RFC3339), time.Since(start))
+			err = client.JoinRoom(ownerID, chatroomID)
 			if err != nil {
 				log.Fatalf("Failed to join room: %v", err)
 			}
 		}
 	}()
 
-	for {
-		time.Sleep(10 * time.Second)
+	<-stop
+
+	log.Printf("Shuting down...\n")
+
+	if err := client.LeaveRoom(ownerID, chatroomID); err != nil {
+		log.Printf("Error leaving room: %v", err)
 	}
 }
 

@@ -13,7 +13,7 @@ type OperationID struct {
 	sync.Mutex
 }
 
-func (o *OperationID) Get() int {
+func (o *OperationID) GetNew() int {
 	o.Lock()
 	defer o.Unlock()
 
@@ -24,9 +24,9 @@ func (o *OperationID) Get() int {
 }
 
 type Room struct {
-	ID        string
-	ChatID    string
-	ChatQueue string
+	OnwerID    string
+	ChatroomID string
+	ChatQueue  string
 }
 
 type IMVU struct {
@@ -70,7 +70,7 @@ func (i *IMVU) Login(username, password string) error {
 
 	err = i.api.ConnectMsgStream(i.UserID)
 	if err != nil {
-		return fmt.Errorf("failed to connect to WebSocket: %w", err)
+		return fmt.Errorf("failed to connect to messages stream: %w", err)
 	}
 
 	i.api.client.AddHeader("X-Imvu-Sauce", me.Sauce)
@@ -83,19 +83,19 @@ func (i *IMVU) Login(username, password string) error {
 }
 
 func (i *IMVU) JoinRoom(roomID, roomChatID string) error {
-	err := i.api.JoinRoom(i.sauce, roomID, roomChatID)
+	err := i.api.JoinRoom(roomID, roomChatID)
 	if err != nil {
 		return fmt.Errorf("failed to join room: %w", err)
 	}
 
 	sceneQueue := fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, roomChatID)
-	err = i.api.SubscribeToQueue(sceneQueue, OpID.Get())
+	err = i.api.SubscribeToQueue(sceneQueue, OpID.GetNew())
 	if err != nil {
 		return fmt.Errorf("failed to send scene subscribe message: %w", err)
 	}
 
 	roomQueue := fmt.Sprintf("inv:/room/room-%s-%s", roomID, roomChatID)
-	err = i.api.SubscribeToQueue(roomQueue, OpID.Get())
+	err = i.api.SubscribeToQueue(roomQueue, OpID.GetNew())
 	if err != nil {
 		return fmt.Errorf("failed to send scene subscribe message: %w", err)
 	}
@@ -104,15 +104,15 @@ func (i *IMVU) JoinRoom(roomID, roomChatID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get room chat ID: %w", err)
 	}
-	err = i.api.SubscribeToQueue(chatQueue, OpID.Get())
+	err = i.api.SubscribeToQueue(chatQueue, OpID.GetNew())
 	if err != nil {
 		return fmt.Errorf("failed to send chat subscribe message: %w", err)
 	}
 
 	i.currentRoom = &Room{
-		ID:        roomID,
-		ChatID:    roomChatID,
-		ChatQueue: chatQueue,
+		OnwerID:    roomID,
+		ChatroomID: roomChatID,
+		ChatQueue:  chatQueue,
 	}
 
 	// TODO: Test how CmdPutOnOutfit and CmdUse work. Maybe create a function to handle the player outfits?
@@ -145,7 +145,7 @@ func (i *IMVU) SendChatMessage(message string) error {
 	room := i.currentRoom
 
 	payload := ChatMessagePayload{
-		ChatID:  room.ChatID,
+		ChatID:  room.ChatroomID,
 		Message: message,
 		To:      0,
 		UserID:  i.UserID,

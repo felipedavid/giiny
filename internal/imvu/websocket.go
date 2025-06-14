@@ -75,7 +75,7 @@ func NewWebSocketClient(url string, headers http.Header) *WebSocketClient {
 		url:               url,
 		headers:           headers,
 		done:              make(chan struct{}),
-		pingInterval:      5 * time.Second,
+		pingInterval:      16 * time.Second,
 		reconnectInterval: 5 * time.Second,
 	}
 }
@@ -210,7 +210,7 @@ func (wsc *WebSocketClient) SendConnect(userID, cookie string) error {
 				Value:  base64.StdEncoding.EncodeToString([]byte("big")),
 			},
 		},
-		OpID: OpID.Get(),
+		OpID: OpID.GetNew(),
 	}
 	return wsc.SendMessage(connectMessage)
 }
@@ -248,7 +248,7 @@ func (wsc *WebSocketClient) SendChatMessage(queue, mount string, chatPayload Cha
 		Queue:   queue,
 		Mount:   mount,
 		Message: encodedPayload,
-		OpID:    OpID.Get(),
+		OpID:    OpID.GetNew(),
 	}
 
 	fmt.Printf("[SENDING_CHAT_MESSAGE] [QUEUE: %s] [MOUNT: %s] [MESSAGE: %s] [OPID: %d]\n", queue, mount, string(chatPayload.Message), OpID.ID)
@@ -262,7 +262,7 @@ func (wsc *WebSocketClient) SendPing() error {
 		Record: "msg_c2g_ping",
 	}
 
-	fmt.Printf("[SENDING_PING_MESSAGE] [RECORD: %s]\n", pingMessage.Record)
+	fmt.Printf("[SENDING_PING_MESSAGE] [RECORD: %s] [OP_ID: %d]\n", pingMessage.Record)
 
 	return wsc.SendMessage(pingMessage)
 }

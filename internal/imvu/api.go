@@ -94,8 +94,8 @@ func (i *API) GetUser(userID string) (*User, error) {
 	return res.User, nil
 }
 
-func (i *API) JoinRoom(sauce, roomID, chatID string) error {
-	resp, err := i.client.Post(fmt.Sprintf("/chat/chat-%s-%s/participants", roomID, chatID), map[string]string{}, nil)
+func (i *API) JoinRoom(ownerID, chatroomID string) error {
+	resp, err := i.client.Post(fmt.Sprintf("/chat/chat-%s-%s/participants", ownerID, chatroomID), map[string]string{}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to enter chat: %w", err)
 	}
