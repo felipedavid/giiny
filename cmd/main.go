@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"giiny/internal/imvu"
@@ -14,34 +15,31 @@ import (
 func main() {
 	_ = godotenv.Load("../.env")
 
-	imvu, err := imvu.New()
+	client, err := imvu.New()
 	if err != nil {
 		log.Fatalf("Failed to create IMVU instance: %v", err)
 	}
 
 	username := os.Getenv("USERNAME")
 	password := os.Getenv("PASSWORD")
-	err = imvu.Login(username, password)
+	err = client.Login(username, password)
 	if err != nil {
 		log.Fatalf("Failed to login: %v", err)
 	}
 
-	err = imvu.JoinRoom("361230062", "140")
+	roomURL := os.Getenv("ROOM_URL")
+	roomID, roomChatID := getRoomIDsFromURL(roomURL)
+
+	err = client.JoinRoom(roomID, roomChatID)
 	if err != nil {
 		log.Fatalf("Failed to join room: %v", err)
 	}
 
-	imvu.SendChatMessage("*imvu:isPureUser")
-	imvu.SendChatMessage("*putOnOutfit 70312022 12444122 13831030 16070306 19442649 23974249 55139083 55595518 63520397 63520471 70082645 70082730 55595754 61753525 62845575 59508957 63520653 63520746")
-	imvu.SendChatMessage("*use 70312022 12444122 13831030 16070306 19442649 23974249 55139083 55595518 63520397 63520471 70082645 70082730 55595754 61753525 62845575 59508957 63520653 63520746")
-	imvu.SendChatMessage("*msg SeatAssignment 3 373088882 1 0")
-
 	time.Sleep(5 * time.Second)
-	imvu.SendChatMessage("Hii gomp senpai :3")
-
+	client.SendChatMessage("Hii gomp senpai :3")
 	time.Sleep(5 * time.Second)
 
-	err = imvu.LeaveRoom("361230062", "140")
+	err = client.LeaveRoom(roomID, roomChatID)
 	if err != nil {
 		log.Fatalf("Failed to leave room: %v", err)
 	}
@@ -51,12 +49,8 @@ func main() {
 	go func() {
 		for {
 			time.Sleep(1 * time.Minute)
-			imvu.SendChatMessage(fmt.Sprintf("Current time: %s, Uptime: %s", time.Now().Format(time.RFC3339), time.Since(start)))
-			imvu.SendChatMessage("*imvu:isPureUser")
-			imvu.SendChatMessage("*putOnOutfit 70312022 12444122 13831030 16070306 19442649 23974249 55139083 55595518 63520397 63520471 70082645 70082730 55595754 61753525 62845575 59508957 63520653 63520746")
-			imvu.SendChatMessage("*use 70312022 12444122 13831030 16070306 19442649 23974249 55139083 55595518 63520397 63520471 70082645 70082730 55595754 61753525 62845575 59508957 63520653 63520746")
-			imvu.SendChatMessage("*msg SeatAssignment 3 373088882 1 0")
-			err = imvu.JoinRoom("361230062", "140")
+			client.SendChatMessage(fmt.Sprintf("Current time: %s, Uptime: %s", time.Now().Format(time.RFC3339), time.Since(start)))
+			err = client.JoinRoom("361230062", "140")
 			if err != nil {
 				log.Fatalf("Failed to join room: %v", err)
 			}
@@ -66,4 +60,14 @@ func main() {
 	for {
 		time.Sleep(10 * time.Second)
 	}
+}
+
+func getRoomIDsFromURL(roomURL string) (string, string) {
+	roomURLSplit := strings.Split(roomURL, "/")
+	roomURLSplit = strings.Split(roomURLSplit[len(roomURLSplit)-1], "-")
+	if len(roomURLSplit) < 3 {
+		return "", ""
+	}
+
+	return roomURLSplit[1], roomURLSplit[2]
 }
