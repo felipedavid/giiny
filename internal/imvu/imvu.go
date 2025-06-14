@@ -23,12 +23,19 @@ func (o *OperationID) Get() int {
 	return result
 }
 
+type Room struct {
+	ID        string
+	ChatID    string
+	ChatQueue string
+}
+
 type IMVU struct {
 	Authenticated bool
 	UserID        string
 	User          *User
 	sauce         string
 	api           *API
+	currentRoom   *Room
 }
 
 func New() (*IMVU, error) {
@@ -101,6 +108,12 @@ func (i *IMVU) JoinRoom(roomID, roomChatID string) error {
 		return fmt.Errorf("failed to send chat subscribe message: %w", err)
 	}
 
+	i.currentRoom = &Room{
+		ID:        roomID,
+		ChatID:    roomChatID,
+		ChatQueue: chatQueue,
+	}
+
 	return nil
 }
 
@@ -114,15 +127,21 @@ func (i *IMVU) LeaveRoom(roomID, chatID string) error {
 }
 
 func (i *IMVU) SendChatMessage(message string) error {
+	if i.currentRoom == nil {
+		return fmt.Errorf("not in a room, cannot send message")
+	}
+
+	room := i.currentRoom
+
 	payload := ChatMessagePayload{
-		ChatID:  "140",
+		ChatID:  room.ChatID,
 		Message: message,
 		To:      0,
 		UserID:  i.UserID,
 	}
 
 	err := i.api.SendChatMessage(
-		"/chat/1288039708",
+		room.ChatQueue,
 		"messages",
 		payload,
 	)

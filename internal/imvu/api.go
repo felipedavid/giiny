@@ -135,7 +135,7 @@ type Chat struct {
 	Denormalized map[string]DenormalizedEntry
 }
 
-func (i *API) GetChat(roomID, chatID string) (*Chat, error) {
+func (i *API) GetChat(roomID, chatID string) (*GetChatResponse, error) {
 	resp, err := i.client.Get(fmt.Sprintf("/chat/chat-%s-%s", roomID, chatID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chat: %w", err)
@@ -147,14 +147,7 @@ func (i *API) GetChat(roomID, chatID string) (*Chat, error) {
 		return nil, fmt.Errorf("failed to parse chat response: %w", err)
 	}
 
-	// Convert GetChatResponse to Chat struct (or just return the response as Chat)
-	chat := &Chat{
-		Status:       chatResp.Status,
-		ID:           chatResp.ID,
-		Denormalized: chatResp.Denormalized,
-	}
-
-	return chat, nil
+	return &chatResp, nil
 }
 
 func (i *API) GetRoomChatQueue(roomID, roomChatID string) (string, error) {
