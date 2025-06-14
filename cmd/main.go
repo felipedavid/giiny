@@ -42,14 +42,18 @@ func main() {
 	imvu.SendChatMessage("*msg SeatAssignment 3 373088882 1 0")
 
 	time.Sleep(5 * time.Second)
-	imvu.SendChatMessage("Hii gomp senpai UwU")
+	imvu.SendChatMessage("Hii gomp senpai :3")
 
-	//start := time.Now()
+	start := time.Now()
 
 	go func() {
 		for {
 			time.Sleep(1 * time.Minute)
-			fmt.Printf("Rejoining room after 1 minute...\n")
+			imvu.SendChatMessage(fmt.Sprintf("Current time: %s, Uptime: %s", time.Now().Format(time.RFC3339), time.Since(start)))
+			imvu.SendChatMessage("*imvu:isPureUser")
+			imvu.SendChatMessage("*putOnOutfit 70312022 12444122 13831030 16070306 19442649 23974249 55139083 55595518 63520397 63520471 70082645 70082730 55595754 61753525 62845575 59508957 63520653 63520746")
+			imvu.SendChatMessage("*use 70312022 12444122 13831030 16070306 19442649 23974249 55139083 55595518 63520397 63520471 70082645 70082730 55595754 61753525 62845575 59508957 63520653 63520746")
+			imvu.SendChatMessage("*msg SeatAssignment 3 373088882 1 0")
 			err = imvu.JoinRoom("361230062", "140")
 			if err != nil {
 				log.Fatalf("Failed to join room: %v", err)
@@ -58,7 +62,6 @@ func main() {
 	}()
 
 	for {
-		//imvu.SendChatMessage("Time since start: " + time.Since(start).String())
-		time.Sleep(5 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }

@@ -75,23 +75,28 @@ func (i *IMVU) Login(username, password string) error {
 	return nil
 }
 
-func (i *IMVU) JoinRoom(roomID, chatID string) error {
-	err := i.api.JoinRoom(i.sauce, roomID, chatID)
+func (i *IMVU) JoinRoom(roomID, roomChatID string) error {
+	chatQueue, err := i.api.GetRoomChatQueue(roomID, roomChatID)
+	if err != nil {
+		return fmt.Errorf("failed to get room chat ID: %w", err)
+	}
+
+	err = i.api.JoinRoom(i.sauce, roomID, roomChatID)
 	if err != nil {
 		return fmt.Errorf("failed to join room: %w", err)
 	}
 
-	err = i.api.SendSubscribe(fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, chatID), OpID.Get())
+	err = i.api.SendSubscribe(fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, roomChatID), OpID.Get())
 	if err != nil {
 		return fmt.Errorf("failed to send scene subscribe message: %w", err)
 	}
 
-	err = i.api.SendSubscribe(fmt.Sprintf("inv:/room/room-%s-%s", roomID, chatID), OpID.Get())
+	err = i.api.SendSubscribe(fmt.Sprintf("inv:/room/room-%s-%s", roomID, roomChatID), OpID.Get())
 	if err != nil {
 		return fmt.Errorf("failed to send scene subscribe message: %w", err)
 	}
 
-	err = i.api.SendSubscribe("/chat/1286931824", OpID.Get())
+	err = i.api.SendSubscribe(chatQueue, OpID.Get())
 	if err != nil {
 		return fmt.Errorf("failed to send chat subscribe message: %w", err)
 	}
@@ -117,7 +122,7 @@ func (i *IMVU) SendChatMessage(message string) error {
 	}
 
 	err := i.api.SendChatMessage(
-		"/chat/1286931824",
+		"/chat/1288039708",
 		"messages",
 		payload,
 	)
