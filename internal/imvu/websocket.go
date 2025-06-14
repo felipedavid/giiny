@@ -328,14 +328,46 @@ func (wsc *WebSocketClient) handleMessage(message []byte) {
 	var wsMessage WebSocketMessage
 	if err := json.Unmarshal(message, &wsMessage); err == nil {
 		// Check if it's a pong message
-		if wsMessage.Record == "msg_g2c_pong" {
+		switch wsMessage.Record {
+		case "msg_g2c_pong":
 			log.Printf("Received pong message: %s", string(message))
 			fmt.Printf("-> [RECEIVED_PONG_MESSAGE] [RECORD: %s]\n", wsMessage.Record)
 			wsc.mu.Lock()
 			wsc.lastPongReceived = time.Now()
 			wsc.mu.Unlock()
-			return
-		} else {
+		case "msg_g2c_send_message":
+			var payload WebSocketSendMessageMessage
+			if err := json.Unmarshal(message, &payload); err != nil {
+				log.Printf("Failed to parse send message payload: %v", err)
+				return
+			}
+
+			// decode base64 encoded message
+			decodedMessage, err := base64.StdEncoding.DecodeString(payload.Message)
+			if err != nil {
+				log.Printf("Failed to decode message: %v", err)
+				return
+			}
+
+			var chatPayload ChatMessagePayloadResponse
+			if err := json.Unmarshal(decodedMessage, &chatPayload); err != nil {
+				log.Printf("Failed to parse chat message payload: %v", err)
+				return
+			}
+
+			message := chatPayload.Message
+			if len(message) == 0 {
+				return
+			}
+
+			if message[0] == '*' {
+				return
+			}
+
+			if message[0] == '!' {
+				log.Printf("Running command: %s", message[1:])
+			}
+		default:
 			log.Printf("Received message with record type: %s", wsMessage.Record)
 		}
 	} else {

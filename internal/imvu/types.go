@@ -223,3 +223,10 @@ type ChatMessagePayload struct {
 	To      int    `json:"to"`
 	UserID  string `json:"userId"`
 }
+
+type ChatMessagePayloadResponse struct {
+	ChatID  int    `json:"chatId"`
+	Message string `json:"message"`
+	To      int    `json:"to"`
+	UserID  int    `json:"userId"`
+}
