@@ -112,37 +112,13 @@ func (i *API) JoinRoom(sauce, roomID, chatID string) error {
 	return nil
 }
 
-type GetChatResponse struct {
-	Status       string                       `json:"status"`
-	ID           string                       `json:"id"`
-	Denormalized map[string]DenormalizedEntry `json:"denormalized"`
-}
-
-type DenormalizedEntry struct {
-	Data      map[string]any `json:"data"`
-	Relations map[string]any `json:"relations"`
-	Updates   *UpdateInfo    `json:"updates"`
-}
-
-type UpdateInfo struct {
-	Queue string `json:"queue"`
-	Mount string `json:"mount"`
-}
-
-type Chat struct {
-	Status       string
-	ID           string
-	Denormalized map[string]DenormalizedEntry
-}
-
-func (i *API) GetChat(roomID, chatID string) (*GetChatResponse, error) {
+func (i *API) GetChat(roomID, chatID string) (*BaseResponse, error) {
 	resp, err := i.client.Get(fmt.Sprintf("/chat/chat-%s-%s", roomID, chatID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chat: %w", err)
 	}
-	defer resp.Body.Close()
 
-	var chatResp GetChatResponse
+	var chatResp BaseResponse
 	if err := ParseResponse(resp, &chatResp); err != nil {
 		return nil, fmt.Errorf("failed to parse chat response: %w", err)
 	}
@@ -156,14 +132,18 @@ func (i *API) GetRoomChatQueue(roomID, roomChatID string) (string, error) {
 		return "", fmt.Errorf("failed to get chat: %w", err)
 	}
 
-	queue := chat.Denormalized[fmt.Sprintf("https://api.imvu.com/chat/chat-%s-%s", roomID, roomChatID)].Data["imq_queue"]
+	entityID := fmt.Sprintf("https://api.imvu.com/chat/chat-%s-%s", roomID, roomChatID)
 
-	queueStr, ok := queue.(string)
-	if !ok {
-		return "", fmt.Errorf("unexpected queue type: %T", queue)
+	type ChatData struct {
+		ImqQueue string `json:"imq_queue"`
 	}
 
-	return queueStr, nil
+	chatData, err := ExtractEntity[ChatData](chat, entityID)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract chat data: %w", err)
+	}
+
+	return chatData.ImqQueue, nil
 }
 
 func (i *API) LeaveRoom(roomID, chatID, userID string) error {
