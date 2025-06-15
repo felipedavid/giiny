@@ -145,10 +145,10 @@ func (i *IMVU) SendChatMessage(message string) error {
 	room := i.currentRoom
 
 	payload := ChatMessagePayload{
-		ChatID:  room.ChatroomID,
+		ChatID:  StringOrInt(room.ChatroomID),
 		Message: message,
-		To:      0,
-		UserID:  i.UserID,
+		To:      StringOrInt("0"),
+		UserID:  StringOrInt(i.UserID),
 	}
 
 	err := i.api.SendChatMessage(

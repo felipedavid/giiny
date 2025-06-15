@@ -62,11 +62,11 @@ type WebSocketSubscribeMessage struct {
 
 // WebSocketSendMessageMessage represents a send message message to be sent over WebSocket
 type WebSocketSendMessageMessage struct {
-	Record  string `json:"record"`
-	Queue   string `json:"queue"`
-	Mount   string `json:"mount"`
-	Message string `json:"message"`
-	OpID    int    `json:"op_id"`
+	Record  string             `json:"record"`
+	Queue   string             `json:"queue"`
+	Mount   string             `json:"mount"`
+	Message ChatMessagePayload `json:"message"`
+	OpID    int                `json:"op_id"`
 }
 
 // NewWebSocketClient creates a new WebSocket client
@@ -235,19 +235,11 @@ func (wsc *WebSocketClient) SendSubscribeToQueue(name string, opID int) error {
 
 // SendChatMessage sends a chat message to the server
 func (wsc *WebSocketClient) SendChatMessage(queue, mount string, chatPayload ChatMessagePayload) error {
-	payloadJSON, err := json.Marshal(chatPayload)
-	if err != nil {
-		log.Printf("Failed to marshal chat payload: %v", err)
-	}
-
-	// Base64 encode the JSON payload
-	encodedPayload := base64.StdEncoding.EncodeToString(payloadJSON)
-
 	sendMessageMessage := WebSocketSendMessageMessage{
 		Record:  "msg_c2g_send_message",
 		Queue:   queue,
 		Mount:   mount,
-		Message: encodedPayload,
+		Message: chatPayload,
 		OpID:    OpID.GetNew(),
 	}
 
@@ -284,7 +276,7 @@ func (wsc *WebSocketClient) readMessages() {
 			log.Printf("WebSocket reader received done signal")
 			return
 		default:
-			messageType, message, err := wsc.conn.ReadMessage()
+			_, message, err := wsc.conn.ReadMessage()
 			if err != nil {
 				// Check if it's a normal closure
 				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
@@ -314,7 +306,7 @@ func (wsc *WebSocketClient) readMessages() {
 			}
 
 			// Log message type and content
-			log.Printf("Received message type: %d, content: %s", messageType, string(message))
+			//log.Printf("Received message type: %d, content: %s", messageType, string(message))
 
 			// Handle the message
 			wsc.handleMessage(message)
@@ -342,20 +334,7 @@ func (wsc *WebSocketClient) handleMessage(message []byte) {
 				return
 			}
 
-			// decode base64 encoded message
-			decodedMessage, err := base64.StdEncoding.DecodeString(payload.Message)
-			if err != nil {
-				log.Printf("Failed to decode message: %v", err)
-				return
-			}
-
-			var chatPayload ChatMessagePayloadResponse
-			if err := json.Unmarshal(decodedMessage, &chatPayload); err != nil {
-				log.Printf("Failed to parse chat message payload: %v", err)
-				return
-			}
-
-			message := chatPayload.Message
+			message := payload.Message.Message
 			if len(message) == 0 {
 				return
 			}
@@ -367,8 +346,6 @@ func (wsc *WebSocketClient) handleMessage(message []byte) {
 			if message[0] == '!' {
 				log.Printf("Running command: %s", message[1:])
 			}
-		default:
-			log.Printf("Received message with record type: %s", wsMessage.Record)
 		}
 	} else {
 		log.Printf("Failed to parse message as WebSocketMessage: %v", err)

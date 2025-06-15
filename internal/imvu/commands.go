@@ -1,7 +1,6 @@
 package imvu
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -45,7 +44,13 @@ const (
 )
 
 func (i *IMVU) Exec(command IMVUCommand, args ...string) error {
-	i.SendChatMessage(fmt.Sprintf("*%s %s", command, strings.Join(args, " ")))
+	cmd := string(command)
+	if len(args) > 0 {
+		args := strings.Join(args, " ")
+		cmd += " " + args
+	}
+
+	i.SendChatMessage("*" + cmd)
 
 	return nil
 }

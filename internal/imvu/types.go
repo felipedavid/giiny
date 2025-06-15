@@ -1,11 +1,13 @@
 package imvu
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -217,16 +219,89 @@ func (r *EnterChatResponse) ParseEnterChatResponse() error {
 	return nil
 }
 
-type ChatMessagePayload struct {
-	ChatID  string `json:"chatId"`
-	Message string `json:"message"`
-	To      int    `json:"to"`
-	UserID  string `json:"userId"`
+// StringOrInt is a type that can be unmarshalled from a JSON string or number.
+type StringOrInt string
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (s *StringOrInt) UnmarshalJSON(data []byte) error {
+	// First, try to unmarshal as a string
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		*s = StringOrInt(str)
+		return nil
+	}
+
+	// If it's not a string, try to unmarshal as an integer
+	var num int64
+	if err := json.Unmarshal(data, &num); err == nil {
+		*s = StringOrInt(strconv.FormatInt(num, 10))
+		return nil
+	}
+
+	return fmt.Errorf("value must be a string or an integer")
 }
 
-type ChatMessagePayloadResponse struct {
-	ChatID  int    `json:"chatId"`
-	Message string `json:"message"`
-	To      int    `json:"to"`
-	UserID  int    `json:"userId"`
+// MarshalJSON implements the json.Marshaler interface.
+func (s StringOrInt) MarshalJSON() ([]byte, error) {
+	// try to convert to int
+	if i, err := strconv.ParseInt(string(s), 10, 64); err == nil {
+		return json.Marshal(i)
+	}
+	// otherwise, marshal as string
+	return json.Marshal(string(s))
+}
+
+// String returns the string representation.
+func (s StringOrInt) String() string {
+	return string(s)
+}
+
+// Int converts the value to an int.
+func (s StringOrInt) Int() (int, error) {
+	return strconv.Atoi(string(s))
+}
+
+// Int64 converts the value to an int64.
+func (s StringOrInt) Int64() (int64, error) {
+	return strconv.ParseInt(string(s), 10, 64)
+}
+
+type ChatMessagePayload struct {
+	ChatID  StringOrInt `json:"chatId"`
+	Message string      `json:"message"`
+	To      StringOrInt `json:"to"`
+	UserID  StringOrInt `json:"userId"`
+}
+
+type chatMessageEncodedPayload ChatMessagePayload
+
+// UnmarshalJSON decodes a base64 encoded JSON string into a ChatMessagePayload.
+func (b *ChatMessagePayload) UnmarshalJSON(data []byte) error {
+	dataStr := string(data[1 : len(data)-1])
+	decodedJSON, err := base64.StdEncoding.DecodeString(dataStr)
+	if err != nil {
+		return fmt.Errorf("failed to decode base64 string: %w", err)
+	}
+
+	var alias chatMessageEncodedPayload
+	if err := json.Unmarshal(decodedJSON, &alias); err != nil {
+		return fmt.Errorf("failed to unmarshal decoded JSON payload: %w", err)
+	}
+
+	*b = ChatMessagePayload(alias)
+
+	return nil
+}
+
+// MarshalJSON encodes the ChatMessagePayload into a base64 encoded JSON string.
+func (b ChatMessagePayload) MarshalJSON() ([]byte, error) {
+	payloadJSON, err := json.Marshal(chatMessageEncodedPayload(b))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload to JSON: %w", err)
+	}
+
+	base64String := base64.StdEncoding.EncodeToString(payloadJSON)
+
+	// Wrap the base64 string in quotes to make it a valid JSON string.
+	return []byte(`"` + base64String + `"`), nil
 }
