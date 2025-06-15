@@ -81,7 +81,7 @@ func NewWebSocketClient(url string, headers http.Header) *WebSocketClient {
 }
 
 // Connect establishes a WebSocket connection
-func (wsc *WebSocketClient) Connect() error {
+func (wsc *WebSocketClient) Connect(ch chan ChatMessagePayload) error {
 	wsc.mu.Lock()
 	defer wsc.mu.Unlock()
 
@@ -138,7 +138,7 @@ func (wsc *WebSocketClient) Connect() error {
 	})
 
 	// Start reader goroutine
-	go wsc.readMessages()
+	go wsc.readMessages(ch)
 
 	// Start ping goroutine
 	go wsc.pingPeriodically()
@@ -254,13 +254,13 @@ func (wsc *WebSocketClient) SendPing() error {
 		Record: "msg_c2g_ping",
 	}
 
-	fmt.Printf("[SENDING_PING_MESSAGE] [RECORD: %s] [OP_ID: %d]\n", pingMessage.Record)
+	fmt.Printf("[SENDING_PING_MESSAGE] [RECORD: %s]\n", pingMessage.Record)
 
 	return wsc.SendMessage(pingMessage)
 }
 
 // readMessages reads messages from the WebSocket connection
-func (wsc *WebSocketClient) readMessages() {
+func (wsc *WebSocketClient) readMessages(ch chan ChatMessagePayload) {
 	defer func() {
 		wsc.mu.Lock()
 		wsc.isConnected = false
@@ -295,7 +295,7 @@ func (wsc *WebSocketClient) readMessages() {
 					// Schedule reconnection
 					go func() {
 						time.Sleep(wsc.reconnectInterval)
-						if err := wsc.Connect(); err != nil {
+						if err := wsc.Connect(ch); err != nil {
 							log.Printf("Failed to reconnect: %v", err)
 						} else {
 							log.Printf("Successfully reconnected")
@@ -309,21 +309,21 @@ func (wsc *WebSocketClient) readMessages() {
 			//log.Printf("Received message type: %d, content: %s", messageType, string(message))
 
 			// Handle the message
-			wsc.handleMessage(message)
+			wsc.handleMessage(message, ch)
 		}
 	}
 }
 
 // handleMessage processes incoming WebSocket messages
-func (wsc *WebSocketClient) handleMessage(message []byte) {
+func (wsc *WebSocketClient) handleMessage(message []byte, ch chan ChatMessagePayload) {
 	// Try to parse as a WebSocketMessage
 	var wsMessage WebSocketMessage
 	if err := json.Unmarshal(message, &wsMessage); err == nil {
 		// Check if it's a pong message
 		switch wsMessage.Record {
 		case "msg_g2c_pong":
-			log.Printf("Received pong message: %s", string(message))
-			fmt.Printf("-> [RECEIVED_PONG_MESSAGE] [RECORD: %s]\n", wsMessage.Record)
+			//log.Printf("Received pong message: %s", string(message))
+			//fmt.Printf("-> [RECEIVED_PONG_MESSAGE] [RECORD: %s]\n", wsMessage.Record)
 			wsc.mu.Lock()
 			wsc.lastPongReceived = time.Now()
 			wsc.mu.Unlock()
@@ -334,18 +334,7 @@ func (wsc *WebSocketClient) handleMessage(message []byte) {
 				return
 			}
 
-			message := payload.Message.Message
-			if len(message) == 0 {
-				return
-			}
-
-			if message[0] == '*' {
-				return
-			}
-
-			if message[0] == '!' {
-				log.Printf("Running command: %s", message[1:])
-			}
+			ch <- payload.Message
 		}
 	} else {
 		log.Printf("Failed to parse message as WebSocketMessage: %v", err)
@@ -421,7 +410,7 @@ func (wsc *WebSocketClient) reconnect() {
 
 	// Try to reconnect
 	for {
-		err := wsc.Connect()
+		err := wsc.Connect(nil)
 		if err == nil {
 			log.Println("Successfully reconnected to WebSocket server")
 			return

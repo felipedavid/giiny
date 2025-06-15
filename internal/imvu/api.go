@@ -161,7 +161,7 @@ func (i *API) LeaveRoom(roomID, chatID, userID string) error {
 	return nil
 }
 
-func (i *API) ConnectMsgStream(userID string) error {
+func (i *API) ConnectMsgStream(userID string, ch chan ChatMessagePayload) error {
 	headers := http.Header{}
 
 	headers.Set("User-Agent", i.client.userAgent)
@@ -193,7 +193,7 @@ func (i *API) ConnectMsgStream(userID string) error {
 		//}
 	})
 
-	if err := i.ws.Connect(); err != nil {
+	if err := i.ws.Connect(ch); err != nil {
 		return fmt.Errorf("failed to connect to WebSocket: %w", err)
 	}
 

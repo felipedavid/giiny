@@ -30,12 +30,13 @@ type Room struct {
 }
 
 type IMVU struct {
-	Authenticated bool
-	UserID        string
-	User          *User
-	sauce         string
-	api           *API
-	currentRoom   *Room
+	Authenticated      bool
+	UserID             string
+	User               *User
+	sauce              string
+	api                *API
+	currentRoom        *Room
+	ChatMessageChannel chan ChatMessagePayload
 }
 
 func New() (*IMVU, error) {
@@ -68,13 +69,14 @@ func (i *IMVU) Login(username, password string) error {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
 
-	err = i.api.ConnectMsgStream(i.UserID)
+	i.ChatMessageChannel = make(chan ChatMessagePayload)
+
+	err = i.api.ConnectMsgStream(i.UserID, i.ChatMessageChannel)
 	if err != nil {
 		return fmt.Errorf("failed to connect to messages stream: %w", err)
 	}
 
 	i.api.client.AddHeader("X-Imvu-Sauce", me.Sauce)
-
 	i.sauce = me.Sauce
 	i.Authenticated = true
 	i.User = user
