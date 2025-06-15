@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"giiny/internal/gemini"
 	"giiny/internal/imvu"
 	"log"
 	"strings"
@@ -26,7 +27,7 @@ func Start(username, password, roomOwner, chatID string, client *imvu.IMVU) erro
 	}
 
 	log.Printf("Joined successfully, starting to consume messages")
-	go handleIncomingChatMessages(client.ChatMessageChannel)
+	go handleIncomingChatMessages(client)
 
 	<-doneCh
 
@@ -34,9 +35,9 @@ func Start(username, password, roomOwner, chatID string, client *imvu.IMVU) erro
 	return nil
 }
 
-func handleIncomingChatMessages(ch chan imvu.ChatMessagePayload) {
+func handleIncomingChatMessages(client *imvu.IMVU) {
 	for {
-		message := <-ch
+		message := <-client.ChatMessageChannel
 
 		msg := message.Message
 		firstCh := msg[0]
@@ -46,7 +47,18 @@ func handleIncomingChatMessages(ch chan imvu.ChatMessagePayload) {
 		case '*':
 			// imvu client commands, ignore for now.
 		default:
+			if message.UserID.String() == client.UserID {
+				continue
+			}
 			log.Printf("Message: %s", message.Message)
+			response, err := gemini.Process(message.Message)
+			if err != nil {
+				log.Printf("Error processing message with Gemini: %v", err)
+				continue
+			}
+			for _, msgs := range response {
+				client.SendChatMessage(msgs)
+			}
 		}
 	}
 }

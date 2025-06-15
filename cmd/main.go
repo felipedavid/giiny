@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"giiny/internal/bot"
+	"giiny/internal/gemini"
 	"giiny/internal/imvu"
 
 	"github.com/joho/godotenv"
@@ -13,6 +14,8 @@ import (
 
 func main() {
 	_ = godotenv.Load("../.env")
+
+	gemini.Start()
 
 	client, err := imvu.New()
 	if err != nil {
