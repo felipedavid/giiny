@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const senpaiID = ""
+
 var doneCh chan bool
 
 func Start(username, password, roomOwner, chatID string, client *imvu.IMVU) error {
@@ -47,7 +49,7 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 		case '*':
 			// imvu client commands, ignore for now.
 		default:
-			if message.UserID.String() == client.UserID {
+			if message.UserID.String() == client.UserID || message.UserID.String() != senpaiID {
 				continue
 			}
 			log.Printf("Message: %s", message.Message)
