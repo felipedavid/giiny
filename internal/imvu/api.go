@@ -167,6 +167,7 @@ func (i *API) ConnectMsgStream(userID string, ch chan ChatMessagePayload) error 
 	headers.Set("User-Agent", i.client.userAgent)
 	headers.Set("Origin", "https://www.imvu.com")
 	headers.Set("Host", "wss-imq.imvu.com")
+	headers.Set("Server", "Cowboy")
 
 	cookies, err := i.client.GetCookies("https://wss-imq.imvu.com")
 	if err != nil {

@@ -94,8 +94,7 @@ func (wsc *WebSocketClient) Connect(ch chan ChatMessagePayload) error {
 
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 45 * time.Second,
-		// Add subprotocols if needed
-		// Subprotocols: []string{"chat", "superchat"},
+		//Subprotocols:     []string{"chat", "superchat"},
 	}
 
 	// Log headers being sent
@@ -212,6 +211,15 @@ func (wsc *WebSocketClient) SendConnect(userID, cookie string) error {
 		},
 		OpID: OpID.GetNew(),
 	}
+	fmt.Printf("[SENDING_CONNECT] %+v", connectMessage)
+	return wsc.SendMessage(connectMessage)
+}
+
+func (wsc *WebSocketClient) OpenFloodGates() error {
+	connectMessage := WebSocketConnectMessage{
+		Record: "msg_c2g_open_floodgates",
+	}
+	fmt.Printf("[SENDING_FLOOD_GATE]\n")
 	return wsc.SendMessage(connectMessage)
 }
 

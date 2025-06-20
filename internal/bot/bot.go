@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const senpaiID = ""
+const senpaiID = "361230062"
 
 var doneCh chan bool
 
@@ -39,21 +39,21 @@ func Start(username, password, roomOwner, chatID string, client *imvu.IMVU) erro
 
 func handleIncomingChatMessages(client *imvu.IMVU) {
 	for {
-		message := <-client.ChatMessageChannel
+		msg := <-client.ChatMessageChannel
 
-		msg := message.Message
-		firstCh := msg[0]
+		if len(msg.Message) == 0 || msg.UserID.String() == client.UserID || msg.UserID.String() != senpaiID {
+			continue
+		}
+
+		firstCh := msg.Message[0]
 		switch firstCh {
 		case '!':
-			runCommand(msg[1:])
+			runCommand(msg.Message[1:])
 		case '*':
 			// imvu client commands, ignore for now.
 		default:
-			if message.UserID.String() == client.UserID || message.UserID.String() != senpaiID {
-				continue
-			}
-			log.Printf("Message: %s", message.Message)
-			response, err := gemini.Process(message.Message)
+			log.Printf("Message: %s", msg.Message)
+			response, err := gemini.Process(msg.Message)
 			if err != nil {
 				log.Printf("Error processing message with Gemini: %v", err)
 				continue

@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
-var OpID = OperationID{ID: 57}
+var OpID = OperationID{ID: 0}
 
 type OperationID struct {
 	ID int
@@ -74,6 +75,50 @@ func (i *IMVU) Login(username, password string) error {
 	err = i.api.ConnectMsgStream(i.UserID, i.ChatMessageChannel)
 	if err != nil {
 		return fmt.Errorf("failed to connect to messages stream: %w", err)
+	}
+
+	err = i.api.ws.OpenFloodGates()
+	if err != nil {
+		return fmt.Errorf("unable to open flood gates: %v", err)
+	}
+
+	queues := []string{
+		"inv:/user/user-%s",
+		"private:/user/user-%s",
+		"/user/%s",
+		"inv:/wallet/wallet-%s",
+		"inv:/roulette/roulette-%s",
+		"inv:/store_catalog/store_catalog-next",
+		//"inv:/user/user-362179840",
+		//"inv:/eligible_quest_event/eligible_quest_event-%s-309",
+		//"inv:/eligible_quest_event/eligible_quest_event-%s-300",
+		"inv:/profile/%s",
+		"inv:/profile/user-%s",
+		"inv:/cart/cart-%s",
+		//"inv:/user/user-379408304",
+		//"inv:/user/user-379942485",
+		//"inv:/user/user-375462516",
+		//"inv:/user/user-371103562",
+		//"inv:/user/user-361230062",
+		//"inv:/user/user-375176415",
+		//"inv:/user/user-380315149",
+		//"inv:/user/user-237374487",
+		//"inv:/user/user-379440992",
+		//"inv:/account_order/account_order-co67370135",
+		//"inv:/account_order/account_order-co67369562",
+		//"inv:/account_order/account_order-co67369497",
+		//"inv:/account_order/account_order-1694849152",
+		//"inv:/account_order/account_order-1694848877",
+		//"inv:/account_order/account_order-1694848293",
+		"inv:/avatar/avatar-%s",
+	}
+
+	for _, qName := range queues {
+		if strings.Contains(qName, "%s") {
+			qName = fmt.Sprintf(qName, i.UserID)
+		}
+		time.Sleep(time.Millisecond * 200)
+		i.api.SubscribeToQueue(qName, OpID.GetNew())
 	}
 
 	i.api.client.AddHeader("X-Imvu-Sauce", me.Sauce)
