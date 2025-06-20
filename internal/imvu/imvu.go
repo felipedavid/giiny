@@ -135,6 +135,11 @@ func (i *IMVU) JoinRoom(roomID, roomChatID string) error {
 		return fmt.Errorf("failed to join room: %w", err)
 	}
 
+	go func() {
+		time.Sleep(1 * time.Minute)
+		i.api.JoinRoom(roomID, roomChatID)
+	}()
+
 	sceneQueue := fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, roomChatID)
 	err = i.api.SubscribeToQueue(sceneQueue, OpID.GetNew())
 	if err != nil {

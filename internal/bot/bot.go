@@ -1,11 +1,15 @@
 package bot
 
 import (
+	"fmt"
 	"giiny/internal/gemini"
 	"giiny/internal/imvu"
 	"log"
 	"strings"
+	"time"
 )
+
+var startTime time.Time
 
 const senpaiID = "361230062"
 
@@ -19,6 +23,8 @@ func Start(username, password, roomOwner, chatID string, client *imvu.IMVU) erro
 	if err != nil {
 		return err
 	}
+
+	startTime = time.Now()
 
 	log.Printf("Login successful!")
 	log.Printf("Trying to join a room.")
@@ -48,7 +54,7 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 		firstCh := msg.Message[0]
 		switch firstCh {
 		case '!':
-			runCommand(msg.Message[1:])
+			runCommand(client, msg.Message[1:])
 		case '*':
 			// imvu client commands, ignore for now.
 		default:
@@ -58,14 +64,20 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 				log.Printf("Error processing message with Gemini: %v", err)
 				continue
 			}
-			for _, msgs := range response {
-				client.SendChatMessage(msgs)
+			sentences := strings.Split(response, ";")
+			for _, sentence := range sentences {
+				time.Sleep(1 * time.Second)
+				sentence = strings.TrimSpace(sentence)
+				if len(sentence) > 0 {
+					log.Printf("Sending response: %s", sentence)
+					client.SendChatMessage(sentence)
+				}
 			}
 		}
 	}
 }
 
-func runCommand(cmd string) {
+func runCommand(client *imvu.IMVU, cmd string) {
 	cmd = strings.ToLower(cmd)
 
 	log.Printf("Trying to run command: %s", cmd)
@@ -73,5 +85,8 @@ func runCommand(cmd string) {
 	switch cmd {
 	case "quit":
 		doneCh <- true
+	case "uptime":
+		msg := fmt.Sprintf("Uptime: %s", time.Since(startTime))
+		client.SendChatMessage(msg)
 	}
 }
