@@ -208,7 +208,6 @@ func (i *IMVU) JoinRoom(roomID, roomChatID string) error {
 	i.Exec(CmdImvuIsPureUser)
 	i.Exec(CmdPutOnOutfit, outfitItemIDS...)
 	i.Exec(CmdUse, outfitItemIDS...)
-	i.Exec(CmdMsg, "SeatAssignment", "3", "373088882", "1", "0")
 
 	return nil
 }

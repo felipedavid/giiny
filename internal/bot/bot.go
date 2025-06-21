@@ -56,7 +56,7 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 		case '!':
 			runCommand(client, msg.Message[1:])
 		case '*':
-			// imvu client commands, ignore for now.
+			log.Printf("[%s] Incoming IMVU command: %s", msg.UserID, msg.Message[1:])
 		default:
 			log.Printf("Message: %s", msg.Message)
 			response, err := gemini.Process(msg.Message)
@@ -87,5 +87,15 @@ func runCommand(client *imvu.IMVU, cmd string) {
 	case "uptime":
 		msg := fmt.Sprintf("Uptime: %s", time.Since(startTime))
 		client.SendChatMessage(msg)
+	case "dress":
+		outfitItemIDS := []string{
+			"69320200", "70312022", "12444122", "13831030", "16070306", "19442649", "23974249", "55139083", "55595518", "63520397", "63520471", "70082645", "70082730", "55595754", "61753525", "62845575", "59508957", "63520653", "63520746",
+		}
+
+		client.Exec(imvu.CmdPutOnOutfit, outfitItemIDS...)
+		client.Exec(imvu.CmdUse, outfitItemIDS...)
+	case "lap":
+		client.SendChatMessage("Colinhooo!! uwu *tomato*")
+		client.Exec(imvu.CmdMsg, "SeatAssignment 2 361230062 101 99982")
 	}
 }
