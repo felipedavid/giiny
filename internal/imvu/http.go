@@ -88,7 +88,7 @@ func WithTimeout(timeout time.Duration) ClientOption {
 	}
 }
 
-func (c *HTTPClient) Request(method, path string, body interface{}, headers map[string]string) (*http.Response, error) {
+func (c *HTTPClient) Request(method, path string, body any, headers map[string]string) (*http.Response, error) {
 	fullURL := c.baseURL + path
 
 	var bodyReader io.Reader
@@ -131,11 +131,11 @@ func (c *HTTPClient) Get(path string, headers map[string]string) (*http.Response
 	return c.Request(http.MethodGet, path, nil, headers)
 }
 
-func (c *HTTPClient) Post(path string, body interface{}, headers map[string]string) (*http.Response, error) {
+func (c *HTTPClient) Post(path string, body any, headers map[string]string) (*http.Response, error) {
 	return c.Request(http.MethodPost, path, body, headers)
 }
 
-func (c *HTTPClient) Put(path string, body interface{}, headers map[string]string) (*http.Response, error) {
+func (c *HTTPClient) Put(path string, body any, headers map[string]string) (*http.Response, error) {
 	return c.Request(http.MethodPut, path, body, headers)
 }
 

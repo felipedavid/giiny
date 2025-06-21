@@ -81,7 +81,7 @@ type UserResponse struct {
 }
 
 // ParseResponse parses an HTTP response into the given response struct
-func ParseResponse(resp *http.Response, v interface{}) error {
+func ParseResponse(resp *http.Response, v any) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

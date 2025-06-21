@@ -1,13 +1,13 @@
 package imvu
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
 )
-
-var OpID = OperationID{ID: 0}
 
 type OperationID struct {
 	ID int
@@ -25,7 +25,7 @@ func (o *OperationID) GetNew() int {
 }
 
 type Room struct {
-	OnwerID    string
+	OwnerID    string
 	ChatroomID string
 	ChatQueue  string
 }
@@ -36,19 +36,24 @@ type IMVU struct {
 	User               *User
 	sauce              string
 	api                *API
+	opID               *OperationID
 	currentRoom        *Room
+	roomCancelFunc     context.CancelFunc
 	ChatMessageChannel chan ChatMessagePayload
 }
 
 func New() (*IMVU, error) {
-	api, err := NewAPI()
+	imvu := &IMVU{
+		opID: &OperationID{},
+	}
+
+	api, err := NewAPI(imvu.opID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IMVU API client: %w", err)
 	}
 
-	return &IMVU{
-		api: api,
-	}, nil
+	imvu.api = api
+	return imvu, nil
 }
 
 func (i *IMVU) Login(username, password string) error {
@@ -75,11 +80,6 @@ func (i *IMVU) Login(username, password string) error {
 	err = i.api.ConnectMsgStream(i.UserID, i.ChatMessageChannel)
 	if err != nil {
 		return fmt.Errorf("failed to connect to messages stream: %w", err)
-	}
-
-	err = i.api.ws.OpenFloodGates()
-	if err != nil {
-		return fmt.Errorf("unable to open flood gates: %v", err)
 	}
 
 	queues := []string{
@@ -113,14 +113,16 @@ func (i *IMVU) Login(username, password string) error {
 		"inv:/avatar/avatar-%s",
 	}
 
+	time.Sleep(time.Second * 1)
 	for _, qName := range queues {
 		if strings.Contains(qName, "%s") {
 			qName = fmt.Sprintf(qName, i.UserID)
 		}
+		i.api.SubscribeToQueue(qName, i.opID.GetNew())
 		time.Sleep(time.Millisecond * 200)
-		i.api.SubscribeToQueue(qName, OpID.GetNew())
 	}
 
+	i.api.client.AddHeader("X-Imvu-Application", "next_desktop/1")
 	i.api.client.AddHeader("X-Imvu-Sauce", me.Sauce)
 	i.sauce = me.Sauce
 	i.Authenticated = true
@@ -130,42 +132,73 @@ func (i *IMVU) Login(username, password string) error {
 }
 
 func (i *IMVU) JoinRoom(roomID, roomChatID string) error {
+	if i.roomCancelFunc != nil {
+		i.roomCancelFunc()
+	}
+
 	err := i.api.JoinRoom(roomID, roomChatID)
 	if err != nil {
 		return fmt.Errorf("failed to join room: %w", err)
 	}
 
+	var ctx context.Context
+	ctx, i.roomCancelFunc = context.WithCancel(context.Background())
+
 	go func() {
-		time.Sleep(1 * time.Minute)
-		i.api.JoinRoom(roomID, roomChatID)
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				log.Printf("Rejoining room %s-%s after 1 minute", roomID, roomChatID)
+				err := i.api.JoinRoom(roomID, roomChatID)
+				if err != nil {
+					log.Printf("Failed to rejoin room %s-%s: %v", roomID, roomChatID, err)
+				}
+			case <-ctx.Done():
+				log.Printf("Stopping rejoining room %s-%s", roomID, roomChatID)
+				return
+			}
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(2 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				log.Printf("Changing availability for user %s", i.UserID)
+				err := i.api.ChangeAvalability(i.UserID)
+				if err != nil {
+					log.Printf("Failed to change availability for user %s: %v", i.UserID, err)
+				}
+			case <-ctx.Done():
+				log.Printf("Stopping availability changes for user %s", i.UserID)
+				return
+			}
+		}
 	}()
 
 	sceneQueue := fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, roomChatID)
-	err = i.api.SubscribeToQueue(sceneQueue, OpID.GetNew())
-	if err != nil {
-		return fmt.Errorf("failed to send scene subscribe message: %w", err)
-	}
+	i.api.SubscribeToQueue(sceneQueue, i.opID.GetNew())
 
 	roomQueue := fmt.Sprintf("inv:/room/room-%s-%s", roomID, roomChatID)
-	err = i.api.SubscribeToQueue(roomQueue, OpID.GetNew())
-	if err != nil {
-		return fmt.Errorf("failed to send scene subscribe message: %w", err)
-	}
+	i.api.SubscribeToQueue(roomQueue, i.opID.GetNew())
 
 	chatQueue, err := i.api.GetRoomChatQueue(roomID, roomChatID)
 	if err != nil {
 		return fmt.Errorf("failed to get room chat ID: %w", err)
 	}
-	err = i.api.SubscribeToQueue(chatQueue, OpID.GetNew())
-	if err != nil {
-		return fmt.Errorf("failed to send chat subscribe message: %w", err)
-	}
+	i.api.SubscribeToQueue(chatQueue, i.opID.GetNew())
 
 	i.currentRoom = &Room{
-		OnwerID:    roomID,
+		OwnerID:    roomID,
 		ChatroomID: roomChatID,
 		ChatQueue:  chatQueue,
 	}
+
+	time.Sleep(1 * time.Second)
 
 	// TODO: Test how CmdPutOnOutfit and CmdUse work. Maybe create a function to handle the player outfits?
 	outfitItemIDS := []string{
@@ -181,11 +214,17 @@ func (i *IMVU) JoinRoom(roomID, roomChatID string) error {
 }
 
 func (i *IMVU) LeaveRoom(roomID, chatID string) error {
+	if i.roomCancelFunc != nil {
+		i.roomCancelFunc()
+		i.roomCancelFunc = nil
+	}
+
 	err := i.api.LeaveRoom(roomID, chatID, i.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to leave room: %w", err)
 	}
 
+	i.currentRoom = nil
 	return nil
 }
 
@@ -203,10 +242,10 @@ func (i *IMVU) SendChatMessage(message string) error {
 		UserID:  StringOrInt(i.UserID),
 	}
 
-	err := i.api.SendChatMessage(
+	i.api.SendChatMessage(
 		room.ChatQueue,
 		"messages",
 		payload,
 	)
-	return err
+	return nil
 }

@@ -66,7 +66,6 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 			}
 			sentences := strings.Split(response, ";")
 			for _, sentence := range sentences {
-				time.Sleep(1 * time.Second)
 				sentence = strings.TrimSpace(sentence)
 				if len(sentence) > 0 {
 					log.Printf("Sending response: %s", sentence)

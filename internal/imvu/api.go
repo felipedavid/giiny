@@ -13,10 +13,11 @@ import (
 type API struct {
 	client *HTTPClient
 	ws     *WebSocketClient
+	opID   *OperationID
 }
 
 // New creates a new IMVU API client
-func NewAPI() (*API, error) {
+func NewAPI(opID *OperationID) (*API, error) {
 	client, err := NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
@@ -24,11 +25,12 @@ func NewAPI() (*API, error) {
 
 	return &API{
 		client: client,
+		opID:   opID,
 	}, nil
 }
 
 func (i *API) Authenticate(username, password string) error {
-	loginPayload := map[string]interface{}{
+	loginPayload := map[string]any{
 		"username":               username,
 		"password":               password,
 		"gdpr_cookie_acceptance": false,
@@ -49,7 +51,7 @@ func (i *API) Authenticate(username, password string) error {
 		return fmt.Errorf("login failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	var loginResponse map[string]interface{}
+	var loginResponse map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&loginResponse); err != nil {
 		return fmt.Errorf("failed to parse login response: %w", err)
 	}
@@ -112,6 +114,24 @@ func (i *API) JoinRoom(ownerID, chatroomID string) error {
 	return nil
 }
 
+func (i *API) ChangeAvalability(userID string) error {
+	resp, err := i.client.Post(fmt.Sprintf("/user/user-%s", userID), map[string]any{
+		"availability": "Available",
+		"online":       true,
+	}, nil)
+	if err != nil {
+		return fmt.Errorf("failed to change availability: %w", err)
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to change availability with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return nil
+}
+
 func (i *API) GetChat(roomID, chatID string) (*BaseResponse, error) {
 	resp, err := i.client.Get(fmt.Sprintf("/chat/chat-%s-%s", roomID, chatID), nil)
 	if err != nil {
@@ -163,11 +183,8 @@ func (i *API) LeaveRoom(roomID, chatID, userID string) error {
 
 func (i *API) ConnectMsgStream(userID string, ch chan ChatMessagePayload) error {
 	headers := http.Header{}
-
 	headers.Set("User-Agent", i.client.userAgent)
 	headers.Set("Origin", "https://www.imvu.com")
-	headers.Set("Host", "wss-imq.imvu.com")
-	headers.Set("Server", "Cowboy")
 
 	cookies, err := i.client.GetCookies("https://wss-imq.imvu.com")
 	if err != nil {
@@ -175,106 +192,125 @@ func (i *API) ConnectMsgStream(userID string, ch chan ChatMessagePayload) error 
 	}
 
 	var cookieStrings []string
+	var osCsid string
 	for _, cookie := range cookies {
 		cookieStrings = append(cookieStrings, cookie.String())
+		if cookie.Name == "osCsid" {
+			osCsid = cookie.Value
+		}
 	}
 	if len(cookieStrings) > 0 {
 		headers.Set("Cookie", strings.Join(cookieStrings, "; "))
-	}
-
-	wsURL := "wss://wss-imq.imvu.com/streaming/imvu_pre"
-	i.ws = NewWebSocketClient(wsURL, headers)
-
-	i.ws.SetMessageHandler(func(message []byte) {
-		//log.Printf("Received WebSocket message: %s", string(message))
-
-		//var msgData map[string]interface{}
-		//if err := json.Unmarshal(message, &msgData); err == nil {
-		//	log.Printf("Parsed message data: %v", msgData)
-		//}
-	})
-
-	if err := i.ws.Connect(ch); err != nil {
-		return fmt.Errorf("failed to connect to WebSocket: %w", err)
-	}
-
-	// Get the osCsid cookie from the HTTP client
-	cookies, err = i.GetCookies("https://wss-imq.imvu.com")
-	if err != nil {
-		log.Fatalf("Failed to get cookies: %v", err)
-	}
-
-	// Find the osCsid cookie
-	var osCsid string
-	for _, cookie := range cookies {
-		if cookie.Name == "osCsid" {
-			osCsid = cookie.Value
-			break
-		}
 	}
 
 	if osCsid == "" {
 		log.Println("Warning: osCsid cookie not found, using empty value")
 	}
 
-	err = i.SendConnect(userID, osCsid)
-	if err != nil {
-		log.Printf("Failed to send connect message: %v", err)
-	} else {
-		fmt.Println("Connect message sent successfully")
+	wsURL := "wss://wss-imq.imvu.com/streaming/imvu_pre"
+	config := Config{
+		URL:       wsURL,
+		Headers:   headers,
+		UserID:    userID,
+		SessionID: osCsid,
+		OpID:      i.opID,
+		Metadata: map[string]string{
+			"app":           "imvu_next",
+			"platform_type": "big",
+		},
+		OnMessage: func(message map[string]any) {
+			record, ok := message["record"].(string)
+			if !ok {
+				return
+			}
+
+			if record == "msg_g2c_send_message" {
+				// Re-marshal the message to get it into a byte slice
+				payloadBytes, err := json.Marshal(message)
+				if err != nil {
+					log.Printf("Failed to re-marshal send message payload: %v", err)
+					return
+				}
+
+				var payload WebSocketSendMessageMessage
+				if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+					log.Printf("Failed to parse send message payload: %v", err)
+					return
+				}
+
+				// Now we need to convert payload.Message to ChatMessagePayload
+				chatMessageBytes, err := json.Marshal(payload.Message)
+				if err != nil {
+					log.Printf("Failed to marshal inner chat message: %v", err)
+					return
+				}
+
+				var chatMessage ChatMessagePayload
+				if err := json.Unmarshal(chatMessageBytes, &chatMessage); err != nil {
+					log.Printf("Failed to unmarshal inner chat message: %v", err)
+					return
+				}
+
+				ch <- chatMessage
+			}
+		},
 	}
+
+	i.ws = NewWebSocketClient(config)
+	i.ws.Connect()
 
 	return nil
 }
 
-func (i *API) CloseWebSocket() error {
-	if i.ws == nil {
-		return nil
+func (i *API) CloseWebSocket() {
+	if i.ws != nil {
+		i.ws.Close()
 	}
-	return i.ws.Close()
 }
 
-func (i *API) SendWebSocketMessage(message interface{}) error {
-	if i.ws == nil {
-		return fmt.Errorf("WebSocket not connected")
+func (i *API) SendWebSocketMessage(record string, payload map[string]any) {
+	if i.ws != nil {
+		i.ws.Send(record, payload)
 	}
-	return i.ws.SendMessage(message)
 }
 
-func (i *API) SendConnect(userID, cookie string) error {
+func (i *API) SubscribeToQueue(queue string, opID int) {
 	if i.ws == nil {
-		return fmt.Errorf("WebSocket not connected")
+		log.Println("WebSocket not connected")
+		return
 	}
-	return i.ws.SendConnect(userID, cookie)
+	subscription := map[string]any{
+		"record": "subscription",
+		"name":   queue,
+		"op_id":  opID,
+	}
+	payload := map[string]any{
+		"queues_with_results": []any{subscription},
+	}
+	i.SendWebSocketMessage("msg_c2g_subscribe", payload)
 }
 
-func (i *API) SubscribeToQueue(queue string, opID int) error {
+func (i *API) SendChatMessage(queue, mount string, payload ChatMessagePayload) {
 	if i.ws == nil {
-		return fmt.Errorf("WebSocket not connected")
-	}
-	return i.ws.SendSubscribeToQueue(queue, opID)
-}
-
-func (i *API) SendChatMessage(queue, mount string, payload ChatMessagePayload) error {
-	if i.ws == nil {
-		return fmt.Errorf("WebSocket not connected")
+		log.Println("WebSocket not connected")
+		return
 	}
 
-	return i.ws.SendChatMessage(queue, mount, payload)
-}
-
-func (i *API) SendPing() error {
-	if i.ws == nil {
-		return fmt.Errorf("WebSocket not connected")
+	message := map[string]any{
+		"queue":   queue,
+		"mount":   mount,
+		"message": payload,
+		"op_id":   i.opID.GetNew(),
 	}
-	return i.ws.SendPing()
+
+	i.SendWebSocketMessage("msg_c2g_send_message", message)
 }
 
 func (i *API) IsWebSocketConnected() bool {
 	if i.ws == nil {
 		return false
 	}
-	return i.ws.IsConnected()
+	return i.ws.GetState() == StateAuthenticated
 }
 
 func (i *API) GetCookies(urlStr string) ([]*http.Cookie, error) {
