@@ -10,6 +10,7 @@ import (
 )
 
 var startTime time.Time
+var pause bool = false
 
 const senpaiID = "361230062"
 
@@ -59,6 +60,12 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 			log.Printf("[%s] Incoming IMVU command: %s", msg.UserID, msg.Message[1:])
 		default:
 			log.Printf("Message: %s", msg.Message)
+
+			if pause {
+				fmt.Println("Bot is paused, ignoring message.")
+				continue
+			}
+
 			response, err := gemini.Process(msg.Message)
 			if err != nil {
 				log.Printf("Error processing message with Gemini: %v", err)
@@ -97,5 +104,7 @@ func runCommand(client *imvu.IMVU, cmd string) {
 	case "lap":
 		client.SendChatMessage("Colinhooo!! uwu *tomato*")
 		client.Exec(imvu.CmdMsg, "SeatAssignment 2 361230062 101 99982")
+	case "pause":
+		pause = !pause
 	}
 }

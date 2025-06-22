@@ -32,19 +32,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Something went wrong")
 	}
-
-	// Rejoining the room to avoid to leave :u "gambiarra"
-	//go func() {
-	//	start := time.Now()
-	//	for {
-	//		time.Sleep(90 * time.Second)
-	//		log.Printf("Current time: %s, Uptime: %s\n", time.Now().Format(time.RFC3339), time.Since(start))
-	//		err = client.JoinRoom(ownerID, chatroomID)
-	//		if err != nil {
-	//			log.Fatalf("Failed to join room: %v", err)
-	//		}
-	//	}
-	//}()
 }
 
 func getRoomIDsFromURL(roomURL string) (string, string) {
