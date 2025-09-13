@@ -25,8 +25,8 @@ func main() {
 	username := os.Getenv("USERNAME")
 	password := os.Getenv("PASSWORD")
 
-	roomURL := os.Getenv("ROOM_URL")
-	ownerID, chatroomID := getRoomIDsFromURL(roomURL)
+	roomURL := os.Getenv("ROOM_ID")
+	ownerID, chatroomID := decomposeRoomID(roomURL)
 
 	err = bot.Start(username, password, ownerID, chatroomID, client)
 	if err != nil {
@@ -34,12 +34,11 @@ func main() {
 	}
 }
 
-func getRoomIDsFromURL(roomURL string) (string, string) {
-	roomURLSplit := strings.Split(roomURL, "/")
-	roomURLSplit = strings.Split(roomURLSplit[len(roomURLSplit)-1], "-")
-	if len(roomURLSplit) < 3 {
+func decomposeRoomID(roomURL string) (string, string) {
+	roomIDSplit := strings.Split(roomURL, "-")
+	if len(roomIDSplit) < 3 {
 		return "", ""
 	}
 
-	return roomURLSplit[1], roomURLSplit[2]
+	return roomIDSplit[1], roomIDSplit[2]
 }

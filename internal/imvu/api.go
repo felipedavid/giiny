@@ -218,13 +218,9 @@ func (i *API) ConnectMsgStream(userID string, ch chan ChatMessagePayload) error 
 			"app":           "imvu_next",
 			"platform_type": "big",
 		},
-		OnMessage: func(message map[string]any) {
-			record, ok := message["record"].(string)
-			if !ok {
-				return
-			}
-
-			if record == "msg_g2c_send_message" {
+		OnMessage: func(message *Message) {
+			switch message.Record {
+			case RecordSendMessage:
 				// Re-marshal the message to get it into a byte slice
 				payloadBytes, err := json.Marshal(message)
 				if err != nil {
@@ -252,6 +248,10 @@ func (i *API) ConnectMsgStream(userID string, ch chan ChatMessagePayload) error 
 				}
 
 				ch <- chatMessage
+			case RecordJoinedQueue:
+				log.Printf("User %s joined the chat!!!", *message.UserID)
+			case RecordLeftQueue:
+				log.Printf("User %s left the chat!!!", *message.UserID)
 			}
 		},
 	}
@@ -260,6 +260,25 @@ func (i *API) ConnectMsgStream(userID string, ch chan ChatMessagePayload) error 
 	i.ws.Connect()
 
 	return nil
+}
+
+const (
+	RecordPing        = "msg_c2g_ping"
+	RecordPong        = "msg_g2c_pong"
+	RecordSendMessage = "msg_g2c_send_message"
+	RecordJoinedQueue = "msg_g2c_joined_queue"
+	RecordLeftQueue   = "msg_g2c_left_queue"
+)
+
+type Message struct {
+	Record       string   `json:"record"`
+	UserID       *string  `json:"user_id"`
+	Status       *float64 `json:"status"`
+	ErrorMessage *string  `json:"error_message"`
+	Queue        *string  `json:"queue"`
+	Mount        *string  `json:"mount"`
+	Message      *string  `json:"message"`
+	Sequence     *int     `json:"sequence"`
 }
 
 func (i *API) CloseWebSocket() {

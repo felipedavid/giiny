@@ -51,7 +51,7 @@ type Config struct {
 	ServerTimeoutInterval time.Duration
 	ReconnectIntervals    []time.Duration
 	OnStateChange         func(state State, nextConnectTime *time.Time)
-	OnMessage             func(message map[string]any)
+	OnMessage             func(message *Message)
 	OnPreReconnect        func(callback func(err error, newConfig *Config))
 }
 
@@ -212,15 +212,9 @@ func (c *WebSocketClient) onMessage(data []byte) {
 	c.lastMessageTime = time.Now()
 	c.mu.Unlock()
 
-	var msg map[string]any
+	var msg Message
 	if err := json.Unmarshal(data, &msg); err != nil {
 		log.Printf("Failed to decode IMQ message: %v", err)
-		return
-	}
-
-	msgType, ok := msg["record"].(string)
-	if !ok {
-		log.Println("IMQ message has no 'record' field")
 		return
 	}
 
@@ -228,24 +222,23 @@ func (c *WebSocketClient) onMessage(data []byte) {
 	defer c.mu.Unlock()
 
 	if c.state == StateAuthenticating {
-		if msgType == "msg_g2c_result" {
-			if status, ok := msg["status"].(float64); ok && status == 0 {
+		if msg.Record == "msg_g2c_result" {
+			if msg.Status != nil && *msg.Status == 0 {
 				log.Println("IMQ authenticated")
 				c.onAuthenticated()
 				c.sendOpenFloodgates()
 			} else {
-				errorMsg, _ := msg["error_message"].(string)
-				log.Printf("Failed to authenticate with IMQ: %s", errorMsg)
+				log.Printf("Failed to authenticate with IMQ: %s", *msg.ErrorMessage)
 				c.disconnect()
 				go c.onDisconnected()
 			}
 		} else {
-			log.Printf("Unexpected message type during IMQ authentication: %s", msgType)
+			log.Printf("Unexpected message type during IMQ authentication: %s", msg.Record)
 		}
-	} else if msgType != "msg_g2c_pong" {
+	} else if msg.Record != RecordPong {
 		if c.config.OnMessage != nil {
 			// To avoid race conditions, we pass the message to the handler in a new goroutine.
-			go c.config.OnMessage(msg)
+			go c.config.OnMessage(&msg)
 		}
 	}
 }
