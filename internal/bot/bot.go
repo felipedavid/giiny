@@ -1,10 +1,12 @@
 package bot
 
 import (
+	"bufio"
 	"fmt"
 	"giiny/internal/gemini"
 	"giiny/internal/imvu"
 	"log"
+	"os"
 	"strings"
 	"time"
 )
@@ -16,11 +18,14 @@ const senpaiID = "361230062"
 
 var doneCh chan bool
 
-func Start(username, password, roomOwner, chatID string, client *imvu.IMVU) error {
+var client *imvu.IMVU
+
+func Start(username, password, roomOwner, chatID string, iclient *imvu.IMVU) error {
+	client = iclient
 	doneCh = make(chan bool)
 
 	log.Printf("Trying to login as %s", username)
-	err := client.Login(username, password)
+	err := iclient.Login(username, password)
 	if err != nil {
 		return err
 	}
@@ -30,17 +35,19 @@ func Start(username, password, roomOwner, chatID string, client *imvu.IMVU) erro
 	log.Printf("Login successful!")
 	log.Printf("Trying to join a room.")
 
-	err = client.JoinRoom(roomOwner, chatID)
+	err = iclient.JoinRoom(roomOwner, chatID)
 	if err != nil {
 		return err
 	}
 
 	log.Printf("Joined successfully, starting to consume messages")
-	go handleIncomingChatMessages(client)
+	go handleIncomingChatMessages(iclient)
+
+	prompt()
 
 	<-doneCh
 
-	client.LeaveRoom(roomOwner, chatID)
+	iclient.LeaveRoom(roomOwner, chatID)
 	return nil
 }
 
@@ -55,7 +62,7 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 		firstCh := msg.Message[0]
 		switch firstCh {
 		case '!':
-			runCommand(client, msg.Message[1:])
+			runCommand(msg.Message[1:])
 		case '*':
 			log.Printf("[%s] Incoming IMVU command: %s", msg.UserID, msg.Message[1:])
 		default:
@@ -63,6 +70,10 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 
 			if pause {
 				fmt.Println("Bot is paused, ignoring message.")
+				continue
+			}
+
+			if !strings.Contains(msg.Message, "@giiny") {
 				continue
 			}
 
@@ -83,28 +94,51 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 	}
 }
 
-func runCommand(client *imvu.IMVU, cmd string) {
-	cmd = strings.ToLower(cmd)
+func runCommand(cmd string) error {
+	cmds := strings.Split(cmd, " ")
+	cmd = cmds[0]
 
 	log.Printf("Trying to run command: %s", cmd)
 
 	switch cmd {
-	case "quit":
+	case CmdQuit:
 		doneCh <- true
-	case "uptime":
+	case CmdUptime:
 		msg := fmt.Sprintf("Uptime: %s", time.Since(startTime))
 		client.SendChatMessage(msg)
-	case "dress":
+	case CmdDress:
 		outfitItemIDS := []string{
-			"69320200", "70312022", "12444122", "13831030", "16070306", "19442649", "23974249", "55139083", "55595518", "63520397", "63520471", "70082645", "70082730", "55595754", "61753525", "62845575", "59508957", "63520653", "63520746",
+			"69320200", "70312022", "12444122", "13831030", "16070306",
+			"19442649", "23974249", "55139083", "55595518", "63520397",
+			"63520471", "70082645", "70082730", "55595754", "61753525",
+			"62845575", "59508957", "63520653", "63520746",
 		}
 
 		client.Exec(imvu.CmdPutOnOutfit, outfitItemIDS...)
 		client.Exec(imvu.CmdUse, outfitItemIDS...)
-	case "lap":
+	case CmdLap:
 		client.SendChatMessage("Colinhooo!! uwu *tomato*")
 		client.Exec(imvu.CmdMsg, "SeatAssignment 2 361230062 101 99982")
-	case "pause":
+	case CmdPause:
 		pause = !pause
+	}
+
+	return nil
+}
+
+func prompt() {
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Printf("> ")
+		line, _ := reader.ReadString('\n')
+		err := runCommand(line)
+		if err != nil {
+			fmt.Printf("Error trying to run command: %s", err)
+		}
+
+		if line == "quit" {
+			break
+		}
 	}
 }

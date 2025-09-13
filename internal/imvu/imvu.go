@@ -38,6 +38,7 @@ type IMVU struct {
 	api                *API
 	opID               *OperationID
 	currentRoom        *Room
+	rooms              []Room
 	roomCancelFunc     context.CancelFunc
 	ChatMessageChannel chan ChatMessagePayload
 }
@@ -122,6 +123,21 @@ func (i *IMVU) Login(username, password string) error {
 		time.Sleep(time.Millisecond * 200)
 	}
 
+	go func() {
+		ticker := time.NewTicker(2 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				log.Printf("Changing availability for user %s", i.UserID)
+				err := i.api.ChangeAvalability(i.UserID)
+				if err != nil {
+					log.Printf("Failed to change availability for user %s: %v", i.UserID, err)
+				}
+			}
+		}
+	}()
+
 	i.api.client.AddHeader("X-Imvu-Application", "next_desktop/1")
 	i.api.client.AddHeader("X-Imvu-Sauce", me.Sauce)
 	i.sauce = me.Sauce
@@ -162,24 +178,6 @@ func (i *IMVU) JoinRoom(roomID, roomChatID string) error {
 		}
 	}()
 
-	go func() {
-		ticker := time.NewTicker(2 * time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				log.Printf("Changing availability for user %s", i.UserID)
-				err := i.api.ChangeAvalability(i.UserID)
-				if err != nil {
-					log.Printf("Failed to change availability for user %s: %v", i.UserID, err)
-				}
-			case <-ctx.Done():
-				log.Printf("Stopping availability changes for user %s", i.UserID)
-				return
-			}
-		}
-	}()
-
 	sceneQueue := fmt.Sprintf("inv:/scene/scene-%s-%s", roomID, roomChatID)
 	i.api.SubscribeToQueue(sceneQueue, i.opID.GetNew())
 
@@ -192,17 +190,23 @@ func (i *IMVU) JoinRoom(roomID, roomChatID string) error {
 	}
 	i.api.SubscribeToQueue(chatQueue, i.opID.GetNew())
 
-	i.currentRoom = &Room{
+	room := Room{
 		OwnerID:    roomID,
 		ChatroomID: roomChatID,
 		ChatQueue:  chatQueue,
 	}
 
+	i.rooms = append(i.rooms, room)
+	i.currentRoom = &i.rooms[len(i.rooms)-1]
+
 	time.Sleep(1 * time.Second)
 
 	// TODO: Test how CmdPutOnOutfit and CmdUse work. Maybe create a function to handle the player outfits?
 	outfitItemIDS := []string{
-		"69320200", "70312022", "12444122", "13831030", "16070306", "19442649", "23974249", "55139083", "55595518", "63520397", "63520471", "70082645", "70082730", "55595754", "61753525", "62845575", "59508957", "63520653", "63520746",
+		"69320200", "70312022", "12444122", "13831030", "16070306", "19442649",
+		"23974249", "55139083", "55595518", "63520397", "63520471", "70082645",
+		"70082730", "55595754", "61753525", "62845575", "59508957", "63520653",
+		"63520746",
 	}
 
 	i.Exec(CmdImvuIsPureUser)
