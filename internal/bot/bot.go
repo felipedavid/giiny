@@ -19,7 +19,7 @@ const senpaiID = "361230062"
 var doneCh chan bool
 
 var client *imvu.IMVU
-var room *imvu.Room
+var room *imvu.IMVURoom
 
 func Start(username, password, roomOwner, chatID string, iclient *imvu.IMVU) error {
 	client = iclient
@@ -62,8 +62,6 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 		switch firstCh {
 		case '!':
 			runCommand(msg.Message[1:])
-		case '*':
-			log.Printf("[%s] Incoming IMVU command: %s", msg.UserID, msg.Message[1:])
 		default:
 			log.Printf("User: %s, Message: %s", msg.UserID, msg.Message)
 

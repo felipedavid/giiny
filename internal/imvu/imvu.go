@@ -24,7 +24,7 @@ func (o *OperationID) GetNew() int {
 	return result
 }
 
-type Room struct {
+type IMVURoom struct {
 	OwnerID    string
 	ChatroomID string
 	ChatQueue  string
@@ -37,7 +37,7 @@ type IMVU struct {
 	sauce              string
 	api                *API
 	opID               *OperationID
-	rooms              []*Room
+	rooms              []*IMVURoom
 	roomCancelFunc     context.CancelFunc
 	ChatMessageChannel chan ChatMessagePayload
 }
@@ -144,7 +144,7 @@ func (i *IMVU) Login(username, password string) error {
 	return nil
 }
 
-func (i *IMVU) JoinRoom(roomID, roomChatID string) (*Room, error) {
+func (i *IMVU) JoinRoom(roomID, roomChatID string) (*IMVURoom, error) {
 	if i.roomCancelFunc != nil {
 		i.roomCancelFunc()
 	}
@@ -171,7 +171,7 @@ func (i *IMVU) JoinRoom(roomID, roomChatID string) (*Room, error) {
 	}
 	i.api.SubscribeToQueue(chatQueue, i.opID.GetNew())
 
-	room := &Room{
+	room := &IMVURoom{
 		OwnerID:    roomID,
 		ChatroomID: roomChatID,
 		ChatQueue:  chatQueue,
@@ -205,7 +205,7 @@ func (i *IMVU) HandleRooms(ctx context.Context) {
 	}
 }
 
-func (i *IMVU) WearOutfit(room *Room) {
+func (i *IMVU) WearOutfit(room *IMVURoom) {
 	outfitItemIDS := []string{
 		"69320200", "70312022", "12444122", "13831030", "16070306", "19442649",
 		"23974249", "55139083", "55595518", "63520397", "63520471", "70082645",
@@ -218,7 +218,7 @@ func (i *IMVU) WearOutfit(room *Room) {
 	i.Exec(room, CmdUse, outfitItemIDS...)
 }
 
-func (i *IMVU) LeaveRoom(room *Room) error {
+func (i *IMVU) LeaveRoom(room *IMVURoom) error {
 	if i.roomCancelFunc != nil {
 		i.roomCancelFunc()
 		i.roomCancelFunc = nil
@@ -233,7 +233,7 @@ func (i *IMVU) LeaveRoom(room *Room) error {
 	return nil
 }
 
-func (i *IMVU) SendChatMessage(room *Room, message string) error {
+func (i *IMVU) SendChatMessage(room *IMVURoom, message string) error {
 	payload := ChatMessagePayload{
 		ChatID:  StringOrInt(room.ChatroomID),
 		Message: message,

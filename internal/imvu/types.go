@@ -305,3 +305,88 @@ func (b ChatMessagePayload) MarshalJSON() ([]byte, error) {
 	// Wrap the base64 string in quotes to make it a valid JSON string.
 	return []byte(`"` + base64String + `"`), nil
 }
+
+// Room represents a room entity in the IMVU API
+type Room struct {
+	Name                    *string  `json:"name"`
+	Description             *string  `json:"description"`
+	Type                    *string  `json:"type"`
+	Privacy                 *string  `json:"privacy"`
+	AutoBootWhenOwnerLeaves *bool    `json:"auto_boot_when_owner_leaves"`
+	AutoBootTimeout         *int     `json:"auto_boot_timeout"`
+	ImageURL                *string  `json:"image_url"`
+	ThemedImageURL          *string  `json:"themed_image_url"`
+	Occupancy               *int     `json:"occupancy"`
+	Capacity                *int     `json:"capacity"`
+	Language                *string  `json:"language"`
+	LanguageCode            *string  `json:"language_code"`
+	Rating                  *float64 `json:"rating"`
+	ContentRating           *string  `json:"content_rating"`
+	OwnerAvatarname         *string  `json:"owner_avatarname"`
+	VIPOnly                 *int     `json:"vip_only"`
+	IsAP                    *bool    `json:"is_ap"`
+	IsAPPlus                *bool    `json:"is_ap_plus"`
+	AllowAPPlusProducts     *bool    `json:"allow_ap_plus_products"`
+	IsVIP                   *bool    `json:"is_vip"`
+	IsAgeVerified           *bool    `json:"is_age_verified"`
+	IsFriendsOnly           *bool    `json:"is_friends_only"`
+	IsNonGuestOnly          *bool    `json:"is_non_guest_only"`
+	HasPlusBadge            *bool    `json:"has_plus_badge"`
+	IsPlusBadgeCompatible   *bool    `json:"is_plus_badge_compatible"`
+	HasAudio                *bool    `json:"has_audio"`
+	AudioType               []string `json:"audio_type"`
+	SupportsYoutube         *bool    `json:"supports_youtube"`
+	SupportsAudience        *bool    `json:"supports_audience"`
+	SupportsLiveRoomCompat  *bool    `json:"supports_live_room_compatibility"`
+	MimicChatRoom           *bool    `json:"mimic_chat_room"`
+	IsWhitelisted           *bool    `json:"is_whitelisted"`
+	RenderedImage           *string  `json:"rendered_image"`
+	JoinRoomURL             *string  `json:"join_room_url"`
+	CustomersID             *int     `json:"customers_id"`
+	CustomersRoomID         *int     `json:"customers_room_id"`
+	IsExpired               *bool    `json:"is_expired"`
+}
+
+// RoomSearchResponse represents the response from a room search
+type RoomSearchResponse struct {
+	BaseResponse
+	Rooms []Room `json:"-"` // Populated by ParseRooms
+}
+
+// RoomListData represents the data field for a room list entity
+type RoomListData struct {
+	Items      []string `json:"items"`
+	TotalCount int      `json:"total_count"`
+	Next       string   `json:"next,omitempty"`
+}
+
+// ParseRooms extracts and parses the Room data from the denormalized map
+func (r *RoomSearchResponse) ParseRooms() error {
+	roomListData, err := ExtractEntity[RoomListData](&r.BaseResponse, r.ID)
+	if err != nil {
+		return fmt.Errorf("failed to extract room list data: %w", err)
+	}
+
+	for _, itemID := range roomListData.Items {
+		// The itemID in the list is a reference to another entity in denormalized
+		// which has a "ref" in its relations to the actual room entity.
+		itemEntity, ok := r.Denormalized[itemID]
+		if !ok {
+			log.Printf("Warning: item entity not found in denormalized map: %s", itemID)
+			continue
+		}
+
+		if roomRef, ok := itemEntity.Relations["ref"]; ok {
+			room, err := ExtractEntity[Room](&r.BaseResponse, roomRef)
+			if err != nil {
+				log.Printf("Warning: Failed to parse room data from item relations: %v", err)
+				continue
+			}
+			r.Rooms = append(r.Rooms, *room)
+		} else {
+			log.Printf("Warning: 'ref' relation not found for item: %s", itemID)
+		}
+	}
+
+	return nil
+}

@@ -39,7 +39,7 @@ func NewClient(options ...ClientOption) (*HTTPClient, error) {
 	client := &HTTPClient{
 		httpClient: &http.Client{
 			Jar:     jar,
-			Timeout: 30 * time.Second,
+			Timeout: 5 * time.Minute,
 		},
 		baseURL:   baseURL,
 		userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
@@ -88,8 +88,16 @@ func WithTimeout(timeout time.Duration) ClientOption {
 	}
 }
 
-func (c *HTTPClient) Request(method, path string, body any, headers map[string]string) (*http.Response, error) {
+func (c *HTTPClient) Request(method, path string, body any, headers map[string]string, params map[string]string) (*http.Response, error) {
 	fullURL := c.baseURL + path
+
+	if params != nil {
+		queryParams := url.Values{}
+		for key, value := range params {
+			queryParams.Add(key, value)
+		}
+		fullURL += "?" + queryParams.Encode()
+	}
 
 	var bodyReader io.Reader
 	if body != nil {
@@ -127,20 +135,20 @@ func (c *HTTPClient) Request(method, path string, body any, headers map[string]s
 	return resp, nil
 }
 
-func (c *HTTPClient) Get(path string, headers map[string]string) (*http.Response, error) {
-	return c.Request(http.MethodGet, path, nil, headers)
+func (c *HTTPClient) Get(path string, params map[string]string) (*http.Response, error) {
+	return c.Request(http.MethodGet, path, nil, nil, params)
 }
 
 func (c *HTTPClient) Post(path string, body any, headers map[string]string) (*http.Response, error) {
-	return c.Request(http.MethodPost, path, body, headers)
+	return c.Request(http.MethodPost, path, body, headers, nil)
 }
 
 func (c *HTTPClient) Put(path string, body any, headers map[string]string) (*http.Response, error) {
-	return c.Request(http.MethodPut, path, body, headers)
+	return c.Request(http.MethodPut, path, body, headers, nil)
 }
 
 func (c *HTTPClient) Delete(path string, headers map[string]string) (*http.Response, error) {
-	return c.Request(http.MethodDelete, path, nil, headers)
+	return c.Request(http.MethodDelete, path, nil, headers, nil)
 }
 
 func (c *HTTPClient) GetCookies(urlStr string) ([]*http.Cookie, error) {

@@ -43,7 +43,7 @@ const (
 	CmdSeat                IMVUCommand = "seat"
 )
 
-func (i *IMVU) Exec(room *Room, command IMVUCommand, args ...string) error {
+func (i *IMVU) Exec(room *IMVURoom, command IMVUCommand, args ...string) error {
 	cmd := string(command)
 	if len(args) > 0 {
 		args := strings.Join(args, " ")
