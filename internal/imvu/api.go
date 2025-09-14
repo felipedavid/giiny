@@ -96,7 +96,7 @@ func (i *API) GetUser(userID string) (*User, error) {
 	return res.User, nil
 }
 
-func (i *API) JoinRoom(ownerID, chatroomID string) error {
+func (i *API) JoinChatRoom(ownerID, chatroomID string) error {
 	resp, err := i.client.Post(fmt.Sprintf("/chat/chat-%s-%s/participants", ownerID, chatroomID), map[string]string{}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to enter chat: %w", err)
@@ -109,6 +109,21 @@ func (i *API) JoinRoom(ownerID, chatroomID string) error {
 	}
 	if err := chatResp.ParseEnterChatResponse(); err != nil {
 		return fmt.Errorf("failed to parse chat data: %w", err)
+	}
+
+	return nil
+}
+
+func (i *API) LeaveChatRoom(ownerID, chatID, userID string) error {
+	resp, err := i.client.Delete(fmt.Sprintf("/chat/chat-%s-%s/participants/user-%s", ownerID, chatID, userID), nil)
+	if err != nil {
+		return fmt.Errorf("failed to leave chat: %w", err)
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to leave chat with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	return nil
@@ -164,21 +179,6 @@ func (i *API) GetRoomChatQueue(roomID, roomChatID string) (string, error) {
 	}
 
 	return chatData.ImqQueue, nil
-}
-
-func (i *API) LeaveRoom(roomID, chatID, userID string) error {
-	resp, err := i.client.Delete(fmt.Sprintf("/chat/chat-%s-%s/participants/user-%s", roomID, chatID, userID), nil)
-	if err != nil {
-		return fmt.Errorf("failed to leave chat: %w", err)
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to leave chat with status %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	return nil
 }
 
 func (i *API) ConnectMsgStream(userID string, ch chan ChatMessagePayload) error {
@@ -249,9 +249,13 @@ func (i *API) ConnectMsgStream(userID string, ch chan ChatMessagePayload) error 
 
 				ch <- chatMessage
 			case RecordJoinedQueue:
-				log.Printf("User %s joined the chat!!!", *message.UserID)
+				if strings.Contains(*message.Queue, "/chat") {
+					log.Printf("User %s joined the chat!!! (queue: %s)", *message.UserID, *message.Queue)
+				}
 			case RecordLeftQueue:
-				log.Printf("User %s left the chat!!!", *message.UserID)
+				if strings.Contains(*message.Queue, "/chat") {
+					log.Printf("User %s left the chat!!! (queue: %s)", *message.UserID, *message.Queue)
+				}
 			}
 		},
 	}

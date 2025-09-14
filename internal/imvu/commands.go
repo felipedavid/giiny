@@ -43,6 +43,11 @@ const (
 	CmdSeat                IMVUCommand = "seat"
 )
 
+const (
+	MsgCmdBeginText IMVUCommand = "BeginText"
+	MsgCmdEraseText IMVUCommand = "EraseText"
+)
+
 func (i *IMVU) Exec(room *IMVURoom, command IMVUCommand, args ...string) error {
 	cmd := string(command)
 	if len(args) > 0 {
@@ -51,6 +56,18 @@ func (i *IMVU) Exec(room *IMVURoom, command IMVUCommand, args ...string) error {
 	}
 
 	i.SendChatMessage(room, "*"+cmd)
+
+	return nil
+}
+
+func (i *IMVU) ExecMsg(room *IMVURoom, subCmd IMVUCommand, args ...string) error {
+	cmd := string(subCmd)
+	if len(args) > 0 {
+		args := strings.Join(args, " ")
+		cmd += " " + args
+	}
+
+	i.SendChatMessage(room, "*msg "+cmd)
 
 	return nil
 }

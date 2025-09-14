@@ -15,6 +15,7 @@ var startTime time.Time
 var pause bool = false
 
 const senpaiID = "361230062"
+const giinyID = "373088882"
 
 var doneCh chan bool
 
@@ -58,6 +59,10 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 			continue
 		}
 
+		if msg.UserID.String() == giinyID {
+			continue
+		}
+
 		firstCh := msg.Message[0]
 		switch firstCh {
 		case '!':
@@ -74,6 +79,9 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 				continue
 			}
 
+			client.ExecMsg(room, imvu.MsgCmdBeginText, "2", giinyID, "0", "0")
+			time.Sleep(2 * time.Second)
+
 			response, err := gemini.Process(msg.Message)
 			if err != nil {
 				log.Printf("Error processing message with Gemini: %v", err)
@@ -85,8 +93,11 @@ func handleIncomingChatMessages(client *imvu.IMVU) {
 				if len(sentence) > 0 {
 					log.Printf("Sending response: %s", sentence)
 					client.SendChatMessage(room, sentence)
+					time.Sleep(1 * time.Second)
 				}
 			}
+
+			client.ExecMsg(room, imvu.MsgCmdEraseText, "2", giinyID, "0", "0")
 		}
 	}
 }

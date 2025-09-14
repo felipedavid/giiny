@@ -25,8 +25,8 @@ func main() {
 	username := os.Getenv("USERNAME")
 	password := os.Getenv("PASSWORD")
 
-	roomURL := os.Getenv("ROOM_ID")
-	ownerID, chatroomID := decomposeRoomID(roomURL)
+	roomID := os.Getenv("ROOM_ID")
+	ownerID, chatroomID := decomposeRoomID(roomID)
 
 	err = bot.Start(username, password, ownerID, chatroomID, client)
 	if err != nil {

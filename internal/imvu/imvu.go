@@ -149,7 +149,7 @@ func (i *IMVU) JoinRoom(roomID, roomChatID string) (*IMVURoom, error) {
 		i.roomCancelFunc()
 	}
 
-	err := i.api.JoinRoom(roomID, roomChatID)
+	err := i.api.JoinChatRoom(roomID, roomChatID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to join room: %w", err)
 	}
@@ -194,7 +194,7 @@ func (i *IMVU) HandleRooms(ctx context.Context) {
 			log.Println("Rejoining rooms after 1 minute")
 			for _, room := range i.rooms {
 				log.Printf("Rejoining room-%s-%s", room.OwnerID, room.ChatroomID)
-				err := i.api.JoinRoom(room.OwnerID, room.ChatroomID)
+				err := i.api.JoinChatRoom(room.OwnerID, room.ChatroomID)
 				if err != nil {
 					log.Printf("Failed to rejoin room %s-%s: %v", room.OwnerID, room.ChatroomID, err)
 				}
@@ -224,7 +224,7 @@ func (i *IMVU) LeaveRoom(room *IMVURoom) error {
 		i.roomCancelFunc = nil
 	}
 
-	err := i.api.LeaveRoom(room.OwnerID, room.ChatroomID, i.UserID)
+	err := i.api.LeaveChatRoom(room.OwnerID, room.ChatroomID, i.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to leave room: %w", err)
 	}
